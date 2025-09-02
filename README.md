@@ -47,19 +47,19 @@ Hier wird das eigentliche Modell beschrieben. Die Kombination von objektiven Dat
 ### Kriterien
 Das Modell zur Bewertung der Wohnlagen bezieht bereits die folgenden Kriterien ein (Distanzen immer in Metern):
 - Fußläufige Distanz zum Zentrum (Jahrtausendbrücke)
-- Lärm-Index (laut [Lärmkartierung 2022](https://mleuv.brandenburg.de/mleuv/de/umwelt/immissionsschutz/laerm/umgebungslaerm/laermkartierung/#))
-- Bildung
--- Fußläufige Distanz zur nächstgelegenen Kita
--- Fußläufige Distanz zur nächstgelegenen Schule
--- Anzahl Kitas im Umkreis von 500, 800 und 1000 Metern
--- Anzahl Schulen im Umkreis von 500, 800 und 1000 Metern
-- Nahversorgung
--- Fußläufige Distanz zum nächsten Einzelhandel
--- Anzahl von Einzelhandelsmärkten im Umkreis von 500 und 800 Metern
+- Kitas und Schulen
+    - Fußläufige Distanz zur nächstgelegenen Kita
+    - Fußläufige Distanz zur nächstgelegenen Schule
+    - Anzahl Kitas im Umkreis von 500, 800 und 1000 Metern
+    - Anzahl Schulen im Umkreis von 500, 800 und 1000 Metern
+- Einzelhandel
+    - Fußläufige Distanz zum nächsten Einzelhandel
+    - Anzahl von Einzelhandelsmärkten im Umkreis von 500 und 800 Metern
 - ÖPNV
--- Anzahl von ÖPNV-Haltestellen (Bus und Straßenbahn) im Umkreis von 500 und 800 Metern
--- ÖPNV-Taktung der nächsten Haltestelle morgens (6 - 9 Uhr) in Minuten
--- ÖPNV-Taktung der nächsten Haltestelle abends (16 - 19 Uhr) in Minuten
+    - Anzahl von ÖPNV-Haltestellen (Bus und Straßenbahn) im Umkreis von 500 und 800 Metern
+    - ÖPNV-Taktung der nächsten Haltestelle morgens (6 - 9 Uhr) in Minuten
+    - ÖPNV-Taktung der nächsten Haltestelle abends (16 - 19 Uhr) in Minuten
+- Lärm-Index (laut [Lärmkartierung 2022](https://mleuv.brandenburg.de/mleuv/de/umwelt/immissionsschutz/laerm/umgebungslaerm/laermkartierung/#))
 
 Das Modell kann beliebig um neue Kriterien erweitert werden. Denkbar sind zum Beispiel auch neue Kriterien wie "zwischen der Adresse und dem Zentrum gibt es einen Bahnübergang" oder Ähnliches. Dadurch kann die Trennschärfe des Modells verbessert werden, was anhand der Gütemaße (s.u.) sichtbar werden sollte.
 
@@ -91,7 +91,7 @@ Das bedeutet jedoch nicht zwingend, dass eine Verbesserung an einem Ort automati
 
 ## Verbesserungsmöglichkeiten
 - Ergänzung einer Spalte "stadtteil" für Visualisierung und Vergleich mit bestehendem Bewertungsmodell anhand der Stadtteile 
-- Ergänzung fehlender Daten (Ärztezentren)
+- Ergänzung fehlender Daten analog zu bisherigem Vorgehen (Ärztezentren, Grünflächen)
 - Feinabstimmung und Definition des Punktemodells, um einen dauerhaft stabilen Punktwert zu erhalten
 - POIs (Points of Interest) wie Schulen, Kindergärten, Haltestellen, Ärzte, Apotheken, Supermärkte und Restaurants könnten zukünftig über die Overpass API von OpenStreetMap ermittelt werden. Dadurch entfällt die manuelle Pflege von CSV-Dateien. Es müssen nur jeweils die aktuellen Daten aus OSM-Karten bezogen werden, die bedarfsgerecht und öffentlich verfügbar gepflegt werden können (z. B., ob Kitas tatsächlich noch geöffnet sind).
 - Wesentliche Faktoren für Wohnlagenbestimmung, die noch nicht einbezogen werden:
