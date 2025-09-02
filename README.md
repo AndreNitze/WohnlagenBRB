@@ -118,10 +118,11 @@ Im HTTP Body werden die Koordinaten (erste = Startpunkt, zweite = Jahrtausendbr�
 
 
 ## Verbesserungsmöglichkeiten
-- Ergänzung einer Spalte "stadtteil" für Visualisierung und Vergleich mit bestehendem Bewertungsmodell anhand der Stadtteile (= "Wie sehr entsprechenden die historischen Stadtteile den objektiven Wohnlagen?")
 - Ergänzung fehlender Daten analog zu bisherigem Vorgehen (Ärztezentren, Grünflächen)
 - Feinabstimmung und Definition des Punktemodells, um einen möglichst dauerhaft stabilen Punktwert zu erhalten
 - Ergänzung um "räumliches k-Means", um Glättung zu Quartieren zu ermöglichen
+- Behebung des Problems, dass nicht alle Adressen einen vollständigen Score erhalten und dadurch rausgefiltert und nicht auf der Karte dargestellt werden (vor allem ein Problem in der Peripherie, wenn wenig Infrastruktur im Umkreis ist)
+- Ergänzung einer Spalte "stadtteil" für Visualisierung und Vergleich mit bestehendem Bewertungsmodell anhand der Stadtteile (= "Wie sehr entsprechenden die historischen Stadtteile den objektiven Wohnlagen?")
 - POIs (Points of Interest) wie Schulen, Kindergärten, Haltestellen, Ärzte, Apotheken, Supermärkte und Restaurants könnten zukünftig über die Overpass API von OpenStreetMap ermittelt werden. Dadurch entfällt die manuelle Pflege von CSV-Dateien. Es müssen nur jeweils die aktuellen Daten aus OSM-Karten bezogen werden, die bedarfsgerecht und öffentlich verfügbar gepflegt werden können (z. B., ob Kitas tatsächlich noch geöffnet sind).
 - Wesentliche Faktoren für Wohnlagenbestimmung, die noch nicht einbezogen werden:
    - Makrolage (Nähe Berlin, Autobahn, Flughafen, Risiko von Naturkatastrophen, Entwicklungsprognose laut [Zukuntsatlas](https://www.prognos.com/de/projekt/zukunftsatlas-2019) oder [Wegweiser Kommune](https://www.wegweiser-kommune.de)
