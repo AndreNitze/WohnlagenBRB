@@ -1,7 +1,7 @@
 [project]
 name = "wohnlagenbrb"
 version = "0.1.0"
-description = "Add your description here"
+description = "Modell zur Wohnlagenberechnung für Brandenburg an der Havel"
 requires-python = ">=3.13"
 dependencies = [
     "folium>=0.20.0",
