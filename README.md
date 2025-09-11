@@ -119,7 +119,7 @@ Im HTTP Body werden die Koordinaten (erste = Startpunkt, zweite = Jahrtausendbr�
 
 ## Verbesserungsmöglichkeiten
 - Ergänzung fehlender Daten analog zu bisherigem Vorgehen (Ärztezentren, Grünflächen)
-- Feinabstimmung und Definition des Punktemodells, um einen möglichst dauerhaft stabilen Punktwert zu erhalten
+- Definition und Feinabstimmung des Punktemodells (Gewichtungen), um einen möglichst dauerhaft stabilen Punktwert zu erhalten
 - Ergänzung um "räumliches k-Means", um Glättung zu Quartieren zu ermöglichen
 - Behebung des Problems, dass nicht alle Adressen einen vollständigen Score erhalten und dadurch rausgefiltert und nicht auf der Karte dargestellt werden (vor allem ein Problem in der Peripherie, wenn wenig Infrastruktur im Umkreis ist)
 - Ergänzung einer Spalte "stadtteil" für Visualisierung und Vergleich mit bestehendem Bewertungsmodell anhand der Stadtteile (= "Wie sehr entsprechenden die historischen Stadtteile den objektiven Wohnlagen?")

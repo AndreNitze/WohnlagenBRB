@@ -7,7 +7,9 @@ from collections import defaultdict
 
 # ---------------------------------------------------------
 # Konfiguration
-ORS_URL = "http://localhost:8080/ors/v2/directions/foot-walking/geojson"
+#ORS_URL = "http://localhost:8080/ors/v2/directions/foot-walking/geojson"  # Lokale ORS-Instanz (Docker o.ä.)
+ORS_URL = "https://api.openrouteservice.org/v2/directions/foot-walking/geojson"
+ORS_API_KEY = "your_api_key_here"  # Falls externe ORS-API genutzt wird
 CSV_ADDRESSES     = "data/adressen_geocoded.csv"
 CSV_DESTINATIONS  = "data/haltestellen_geocoded.csv"
 CSV_OUTPUT        = "data/adressen_mit_haltestellen_routen.csv"
@@ -53,7 +55,10 @@ def route_distance(lon_start, lat_start, lon_dest, lat_dest):
         r = requests.post(
             ORS_URL,
             data=json.dumps(payload),
-            headers={"Content-Type": "application/json"},
+            headers={
+                "Authorization": ORS_API_KEY,
+                "Content-Type": "application/json"
+            },
             timeout=10
         )
         r.raise_for_status()
