@@ -93,10 +93,11 @@ Mit dem Skript ```geocoder.py``` können für beliebige CSV-Dateien mit den Spal
 Bus- und Straßenbahnhaltestellen sind mit lokalem Nominatim und OSM-Daten schwer zu finden. Dafür wurde der offizielle Nominatim-Server von [OpenStreetMap](https://nominatim.openstreetmap.org/) unter Einhaltung der Fair Use Policy verwendet.
 
 ## Routing
-Das Routing erfolgt über die [OpenRouteService API](https://openrouteservice.org/), die in einem lokalen Docker-Container (s. [Anleitung](https://giscience.github.io/openrouteservice/run-instance)) betrieben wird. Die API kann dann über folgende URL aufgerufen werden:
+Das Routing erfolgt über die [OpenRouteService API](https://openrouteservice.org/), die entweder von einem externen Server abgerufen wird (Standard, mit Abrufbeschränkungen) oder in einem lokalen Docker-Container betrieben wird (s. [Anleitung](https://giscience.github.io/openrouteservice/run-instance)). Die API kann bei lokalem Einsatz dann über folgende URL aufgerufen werden:
 ```
 POST http://localhost:8080/ors/v2/directions/foot-walking/geojson
 ```
+
 Im HTTP Body werden die Koordinaten (erste = Startpunkt, zweite = Jahrtausendbrücke) und Parameter für die Rückgabe (geometry = Wegpunkte) übergeben:
 ```json
 {
