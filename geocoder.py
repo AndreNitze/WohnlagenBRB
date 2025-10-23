@@ -3,8 +3,8 @@ import requests
 import urllib.parse
 
 # ------------------- Konfiguration -------------------
-CSV_EINGABE = "data/2024_Haltestellen.csv"   # <---- anpassen!
-CSV_AUSGABE = "data/haltestellen_geocoded.csv" # <---- anpassen!
+CSV_EINGABE = "data/2025_Ärzte.csv"   # <---- anpassen!
+CSV_AUSGABE = "data/aerzte_geocoded.csv" # <---- anpassen!
 CITY = "Brandenburg an der Havel"
 COUNTRY = "Brandenburg"  # Additional indicator to narrow down geocoding results
 ZIP_CODE = "14770"       # Additional indicator to narrow down geocoding results
@@ -17,8 +17,8 @@ USER_AGENT = "Brandenburg University of Applied Sciences/1.0 (nitze@th-brandenbu
 
 # ------------------- Hilfsfunktionen -------------------
 def build_address(row):
-    # --- Haltestellen ---
-    if "Name_Haltestelle" in row and not pd.isna(row["Name_Haltestelle"]):
+    # --- Sonderfall "Haltestellen" ---
+    if "Name_Haltestelle" in row and pd.isna(row["Name_Haltestelle"]).empty:
         name = str(row.get("Name_Haltestelle", "")).strip()
 
         # Strip name of commas
@@ -32,7 +32,7 @@ def build_address(row):
             return [f"Tram stop {name}, {COUNTRY}, {ZIP_CODE}"]
         else:
             return [f"{name}, {CITY}"]  # Fallback
-    # --- Adressen ---
+    # --- Reguläre Adressen ---
     street = row.get("Straßenname") or row.get("Straßennamen") or ""
     hn = str(row.get("Hsnr", "")).strip()
     hzusatz = str(row.get("HsnrZus", "")).strip() if "HsnrZus" in row and not pd.isna(row.get("HsnrZus")) else ""
@@ -88,14 +88,14 @@ def geocode_address(address_list, category=None):
         return {'lat': None, 'lon': None, 'display_name': None, 'type': None, 'category': None}
 
 # ------------------- Hauptlogik -------------------
-df = pd.read_csv(CSV_EINGABE, encoding="utf-8")
+df = pd.read_csv(CSV_EINGABE, encoding="utf-8", sep=";")
 df["Adresse_query"] = df.apply(build_address, axis=1)
 df["Adresse_merge"] = df.apply(make_merge_addr, axis=1)
 
 for i, row in df.iterrows():
     address_list = build_address(row)
     category = None
-    if "Kategorie" in row and not pd.isna(row["Kategorie"]):
+    if "Kategorie" in row and pd.isna(row["Kategorie"]).empty:
         cat = str(row["Kategorie"]).lower()
         if cat in ("bus_stop", "tram_stop"):
             category = cat

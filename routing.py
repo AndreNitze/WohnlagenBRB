@@ -94,7 +94,7 @@ for i, addr in df_addr.iterrows():
     lat_a, lon_a = float(addr["lat"]), float(addr["lon"])
     min_dist = None
     min_geom = None
-    counter = {d: 0 for d in DISTANCE_THRESHOLDS}
+    counter = dict.fromkeys(DISTANCE_THRESHOLDS, 0)
 
     if routing:
         candidates = df_dest.copy()
@@ -122,7 +122,7 @@ for i, addr in df_addr.iterrows():
     else:
         min_dist = None
         min_geom = None
-        counter = {d: None for d in DISTANCE_THRESHOLDS}
+        counter = dict.fromkeys(DISTANCE_THRESHOLDS, None)
 
     nearest_distances.append(min_dist)
     nearest_geometries.append(min_geom)
