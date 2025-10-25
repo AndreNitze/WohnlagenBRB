@@ -7,14 +7,14 @@ from collections import defaultdict
 
 # ---------------------------------------------------------
 # Konfiguration
-#ORS_URL = "http://localhost:8080/ors/v2/directions/foot-walking/geojson"  # Lokale ORS-Instanz (Docker o.ä.)
-ORS_URL = "https://api.openrouteservice.org/v2/directions/foot-walking/geojson"
+ORS_URL = "http://localhost:8080/ors/v2/directions/foot-walking/geojson"  # Lokale ORS-Instanz (Docker o.ä.)
+#ORS_URL = "https://api.openrouteservice.org/v2/directions/foot-walking/geojson"
 ORS_API_KEY = "your_api_key_here"  # Falls externe ORS-API genutzt wird
-CSV_ADDRESSES     = "data/adressen_geocoded.csv"
-CSV_DESTINATIONS  = "data/haltestellen_geocoded.csv"
-CSV_OUTPUT        = "data/adressen_mit_haltestellen_routen.csv"
+CSV_ADDRESSES     = "out/adressen_geocoded.csv"
+CSV_DESTINATIONS  = "out/haltestellen_geocoded.csv"
+CSV_OUTPUT        = "out/adressen_mit_haltestellen_routen.csv"
 
-DISTANCE_THRESHOLDS = [500, 800]  # Meter
+DISTANCE_THRESHOLDS = [500, 800, 1000]  # Meter
 routing = True
 use_haversine = True
 HAVERSINE_LIMIT_M = 2000
@@ -80,6 +80,11 @@ df_dest = pd.read_csv(CSV_DESTINATIONS)
 df_addr = df_addr[df_addr["lat"].notna() & df_addr["lon"].notna()].copy()
 df_dest = df_dest[df_dest["lat"].notna() & df_dest["lon"].notna()].copy()
 
+# Sonderfall "Medizinische Zentren": Filtere Einzel-Apotheken raus
+if "is_med_center" in df_dest.columns:
+    df_dest["is_med_center"] = (df_dest["is_med_center"].astype(str).str.lower().isin(["true", "1", "yes", "y"]))
+    df_dest = df_dest[df_dest["is_med_center"] == True].copy()
+
 # ---------------------------------------------------------
 # Routing
 nearest_distances = []
@@ -102,8 +107,15 @@ for i, addr in df_addr.iterrows():
         if use_haversine:
             distances = haversine_np(lat_a, lon_a, lats_d, lons_d)
             mask = distances <= HAVERSINE_LIMIT_M
-            candidates = df_dest[mask]
+            near_candidates = df_dest[mask]
 
+            # Wenn nichts im Umkreis HAVERSINE_LIMIT_M liegt, trotzdem gegen ALLE Ziele routen
+            if len(near_candidates) > 0:
+                candidates = near_candidates
+            else:
+                candidates = df_dest  # <- Fallback
+
+        # Routings zu allen Kandidaten durchführen
         for _, dest in candidates.iterrows():
             dist_m, geom = route_distance(
                 lon_a, lat_a,
@@ -112,20 +124,24 @@ for i, addr in df_addr.iterrows():
             if dist_m is None:
                 continue
 
+            # Vorkommen innerhalb der Schwellen zählen
             for d in DISTANCE_THRESHOLDS:
                 if dist_m <= d:
                     counter[d] += 1
 
+            # Nächstgelegenes Ziel merken
             if min_dist is None or dist_m < min_dist:
                 min_dist = dist_m
                 min_geom = geom
     else:
+        # Kein Routing
         min_dist = None
         min_geom = None
         counter = dict.fromkeys(DISTANCE_THRESHOLDS, None)
 
     nearest_distances.append(min_dist)
     nearest_geometries.append(min_geom)
+
     for d in DISTANCE_THRESHOLDS:
         distance_counters[d].append(counter[d])
 

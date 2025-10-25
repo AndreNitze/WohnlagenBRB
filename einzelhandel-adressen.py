@@ -58,8 +58,8 @@ def route_distance(lon_start, lat_start, lon_dest, lat_dest):
 
 # ------------------------------------------------------------------
 # 1) CSVs laden
-df_addr  = pd.read_csv("data/adressen_mit_routen.csv", encoding="utf-8")
-df_shops = pd.read_csv("data/einzelhandel_geocoded.csv", encoding="utf-8")
+df_addr  = pd.read_csv("out/adressen_mit_routen.csv", encoding="utf-8")
+df_shops = pd.read_csv("out/einzelhandel_geocoded.csv", encoding="utf-8")
 
 # Nur Adressen mit Koordinaten
 df_addr  = df_addr[df_addr["lat"].notna() & df_addr["lon"].notna()].copy()

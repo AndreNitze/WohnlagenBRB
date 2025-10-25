@@ -1,7 +1,7 @@
 # read csv with adresses
 import pandas as pd
 
-df = pd.read_csv("data/adressen_geocoded.csv", encoding="utf-8", sep=",")
+df = pd.read_csv("out/adressen_geocoded.csv", encoding="utf-8", sep=",")
 
 # Convert lat/lon columns to Geometry
 from shapely.geometry import Point
