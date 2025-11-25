@@ -11,8 +11,8 @@ ORS_URL = "http://localhost:8080/ors/v2/directions/foot-walking/geojson"  # Loka
 #ORS_URL = "https://api.openrouteservice.org/v2/directions/foot-walking/geojson"
 ORS_API_KEY = "your_api_key_here"  # Falls externe ORS-API genutzt wird
 CSV_ADDRESSES     = "out/adressen_geocoded.csv"
-CSV_DESTINATIONS  = "out/haltestellen_geocoded.csv"
-CSV_OUTPUT        = "out/adressen_mit_haltestellen_routen.csv"
+CSV_DESTINATIONS  = "out/einzelhandel_geocoded.csv"
+CSV_OUTPUT        = "out/adressen_mit_einzelhandel_routen.csv"
 
 DISTANCE_THRESHOLDS = [500, 800, 1000]  # Meter
 routing = True
@@ -151,7 +151,7 @@ for i, addr in df_addr.iterrows():
 # ---------------------------------------------------------
 # Speichern
 df_addr[f"{DOMAIN}_min_distance_m"] = nearest_distances
-df_addr[f"{DOMAIN}_geometry"] = nearest_geometries
+df_addr[f"{DOMAIN}_route"] = nearest_geometries
 for d in DISTANCE_THRESHOLDS:
     df_addr[f"{DOMAIN}_count_within_{d}m"] = distance_counters[d]
 

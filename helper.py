@@ -1,5 +1,6 @@
 import pandas as pd
 import geopandas as gpd
+import folium
 from shapely import wkt
 from shapely.geometry import Point
 

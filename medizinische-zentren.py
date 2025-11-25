@@ -11,7 +11,7 @@ Aktueller Scope dieses Skripts (Schritt A = Zentrenbildung):
 3) Apotheken mit mindestens 2 unterschiedlichen Praxen im Umkreis von 100 m werden als
    `is_med_center = True` markiert. Diese gelten als "medizinisches Zentrum" nach Anforderung.
 4) Ergebnis ist ein GeoDataFrame `apotheken_tagged` mit u. a.:
-   - `arzt_ct_100m`: Anzahl unterschiedlicher Praxen im 100‑m-Umkreis
+   - `arzt_count_100m`: Anzahl unterschiedlicher Praxen im 100‑m-Umkreis
    - `is_med_center`: True/False, ob die Apotheke als Zentrum zählt
    - Geometrie/Metadaten der Apotheke
 
@@ -28,7 +28,7 @@ Encoding-Hinweise:
 Output dieses Skripts:
 - `out/apotheken_med_center.csv` / `.parquet`
   Enthält alle Apotheken, plus:
-    - `arzt_ct_100m`
+    - `arzt_count_100m`
     - `arzt_keys_100m`
     - `is_med_center`
 Diese Datei ist die Eingabe für den ORS-Schritt.
@@ -149,8 +149,8 @@ def build_med_centers(gdf_aerzte: gpd.GeoDataFrame, gdf_apotheken: gpd.GeoDataFr
 
     Rückgabe: gdf_apotheken mit Spalten
       - arzt_keys_100m (list[str]): Liste der erkannten Praxen-Schlüssel in 100 m
-      - arzt_ct_100m (int): Anzahl unterschiedlicher Praxen in 100 m
-      - is_med_center (bool): True, wenn arzt_ct_100m >= 2
+      - arzt_count_100m (int): Anzahl unterschiedlicher Praxen in 100 m
+      - is_med_center (bool): True, wenn arzt_count_100m >= 2
     """
     # Sicherstellen, dass beide im selben CRS sind
     if gdf_aerzte.crs != gdf_apotheken.crs:
@@ -177,8 +177,8 @@ def build_med_centers(gdf_aerzte: gpd.GeoDataFrame, gdf_apotheken: gpd.GeoDataFr
     ap = ap.merge(grp.rename("arzt_keys_100m").to_frame(), on="id", how="left")
 
     ap["arzt_keys_100m"] = ap["arzt_keys_100m"].apply(lambda v: v if isinstance(v, list) else [])
-    ap["arzt_ct_100m"] = ap["arzt_keys_100m"].apply(len).astype(int)
-    ap["is_med_center"] = ap["arzt_ct_100m"] >= 2
+    ap["arzt_count_100m"] = ap["arzt_keys_100m"].apply(len).astype(int)
+    ap["is_med_center"] = ap["arzt_count_100m"] >= 2
     return ap
 
 

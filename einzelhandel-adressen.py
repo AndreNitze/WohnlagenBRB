@@ -114,9 +114,9 @@ for i, a in df_addr.iterrows():
 
 # ------------------------------------------------------------------
 # 3) Ergebnis anfügen & speichern
-df_addr["shop_min_m"]     = nearest_dist
-df_addr["shops_500m_ct"]  = shops_500m
-df_addr["shops_800m_ct"]  = shops_800m
+df_addr["shop_min_distance_m"]     = nearest_dist
+df_addr["shops_500m_count"]  = shops_500m
+df_addr["shops_800m_count"]  = shops_800m
 
 df_addr.to_csv("data/adressen_mit_einzelhandel.csv", index=False)
 print("✓ Datei geschrieben: adressen_mit_einzelhandel.csv")
