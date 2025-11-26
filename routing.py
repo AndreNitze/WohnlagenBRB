@@ -10,10 +10,13 @@ from collections import defaultdict
 ORS_URL = "http://localhost:8080/ors/v2/directions/foot-walking/geojson"  # Lokale ORS-Instanz (Docker o.ä.)
 #ORS_URL = "https://api.openrouteservice.org/v2/directions/foot-walking/geojson"
 ORS_API_KEY = "your_api_key_here"  # Falls externe ORS-API genutzt wird
-CSV_ADDRESSES     = "out/adressen_geocoded.csv"
-CSV_DESTINATIONS  = "out/einzelhandel_geocoded.csv"
-CSV_OUTPUT        = "out/adressen_mit_einzelhandel_routen.csv"
+DOMAIN = "grundschulen"  # z.B. "kita", "apotheke", "arzt", "schule"
+CSV_ADDRESSES     = "out/adressen_geocoded.csv" # Eingabedatei mit Startstandorten (Adressen)
+CSV_DESTINATIONS  = "out/"+DOMAIN+"_geocoded.csv" # Zielstandorte für Routing
+CSV_OUTPUT        = "out/adressen_mit_"+DOMAIN+"_routen.csv" # Ausgabedatei mit Routeninformationen (LineString)
+# ---------------------------------------------------------
 
+# Optionale Parameter
 DISTANCE_THRESHOLDS = [500, 800, 1000]  # Meter
 routing = True
 use_haversine = True
