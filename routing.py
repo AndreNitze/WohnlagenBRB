@@ -8,6 +8,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import geopandas as gpd
 from shapely.geometry import Point
+from shapely.ops import nearest_points
 
 # ---------------------------------------------------------
 # MODUS-KONFIGURATION
@@ -36,9 +37,16 @@ CSV_OUTPUT        = "out/adressen_mit_" + DOMAIN + "_routen.csv"
 # PARAMETER
 # ---------------------------------------------------------
 DISTANCE_THRESHOLDS = [500, 800, 1000]     # Zählradius
-HAVERSINE_LIMIT_M   = 2000                 # Kandidatensuche
-MAX_WORKERS          = 40                  # parallele Threads
-ROUTING_ENABLED      = True                # debug/skip möglich
+HAVERSINE_LIMIT_M   = 2000                 # Kandidatensuche (aktuell nicht verwendet)
+MAX_WORKERS         = 16                   # parallele Threads
+ROUTING_ENABLED     = True                 # debug/skip möglich
+
+# ---------------------------------------------------------
+# DEBUG-COUNTER
+# ---------------------------------------------------------
+ROUTE_SUCCESS_COUNT = 0
+ROUTE_ERROR_COUNT   = 0
+ROUTE_ERROR_LIMIT   = 10    # max. 10 Fehler detailliert ausgeben
 
 # ---------------------------------------------------------
 # FUNKTIONEN
@@ -57,39 +65,132 @@ def haversine_np(lat1, lon1, lat2, lon2):
 
 def route_distance(lon_a, lat_a, lon_b, lat_b):
     """ORS Fußrouting: gibt (dist_m, Liniengeometrie_json) zurück."""
+    global ROUTE_SUCCESS_COUNT, ROUTE_ERROR_COUNT
+
+    # Guard: falls Koordinaten None/NaN sind, Routing überspringen
+    if lon_a is None or lat_a is None or lon_b is None or lat_b is None:
+        return None, None
+    if any(np.isnan([lon_a, lat_a, lon_b, lat_b])):
+        return None, None
+
+    if not ROUTING_ENABLED:
+        # Distanzberechnung kann zum Debuggen abgeschaltet werden
+        return None, None
+
     payload = {
         "coordinates": [[lon_a, lat_a], [lon_b, lat_b]],
         "instructions": False,
         "geometry": True,
         "preference": "recommended"
     }
+
     try:
         r = requests.post(
             ORS_URL,
             data=json.dumps(payload),
-            headers={"Authorization": ORS_API_KEY,
-                     "Content-Type": "application/json"},
+            headers={
+                "Authorization": ORS_API_KEY,
+                "Content-Type": "application/json"
+            },
             timeout=15
         )
-        r.raise_for_status()
-        feat = r.json()["features"][0]
+
+        if r.status_code != 200:
+            ROUTE_ERROR_COUNT += 1
+            if ROUTE_ERROR_COUNT <= ROUTE_ERROR_LIMIT:
+                print(f"[ORS-ERROR] Status: {r.status_code}")
+                # nur die ersten ~300 Zeichen, damit Console nicht explodiert
+                print(f"[ORS-ERROR] Antwort: {r.text[:300]}")
+                print(f"[ORS-ERROR] Payload: {payload}")
+            return None, None
+
+        data = r.json()
+        if "features" not in data or not data["features"]:
+            ROUTE_ERROR_COUNT += 1
+            if ROUTE_ERROR_COUNT <= ROUTE_ERROR_LIMIT:
+                print("[ORS-ERROR] Keine 'features' im Response.")
+                print(f"[ORS-ERROR] Antwort: {str(data)[:300]}")
+                print(f"[ORS-ERROR] Payload: {payload}")
+            return None, None
+
+        feat = data["features"][0]
         dist = feat["properties"]["summary"]["distance"]
         geom = json.dumps(feat["geometry"])
+
+        ROUTE_SUCCESS_COUNT += 1
+        if ROUTE_SUCCESS_COUNT <= 5:
+            print(f"[ORS-OK] Beispiel-Distanz: {dist} m")
+
         return dist, geom
+
     except Exception as e:
+        ROUTE_ERROR_COUNT += 1
+        if ROUTE_ERROR_COUNT <= ROUTE_ERROR_LIMIT:
+            print(f"[ORS-EXCEPTION] {type(e).__name__}: {e}")
+            print(f"[ORS-EXCEPTION] Payload: {payload}")
         return None, None
 
+
 def nearest_entry_point(point_wgs84, area_geom):
-    """Berechnet Eintrittspunkt für EINE Grünfläche."""
-    point_m = gpd.GeoSeries([point_wgs84], crs=4326).to_crs(32633).iloc[0]
-    poly   = area_geom.to_crs(32633).iloc[0]
+    """
+    Berechnet robust einen Eintrittspunkt für EINE Grünfläche (Polygon oder MultiPolygon).
+    Gibt (lon, lat) in WGS84 zurück oder (None, None), falls nicht möglich.
+    """
+    try:
+        # Punkt -> Meter (UTM Zone 33N)
+        point_m = gpd.GeoSeries([point_wgs84], crs=4326).to_crs(32633).iloc[0]
+    except Exception:
+        return None, None
 
-    entry_m = poly.geometry.boundary.interpolate(
-        poly.geometry.boundary.project(point_m)
-    )
+    if area_geom is None or area_geom.empty:
+        return None, None
 
-    entry_wgs = gpd.GeoSeries([entry_m], crs=32633).to_crs(4326).iloc[0]
-    return entry_wgs.x, entry_wgs.y
+    geom = area_geom.geometry.iloc[0]
+    if geom is None or geom.is_empty:
+        return None, None
+
+    # Multipolygon abfangen: größtes Polygon wählen
+    if geom.geom_type == "MultiPolygon":
+        if len(geom.geoms) == 0:
+            return None, None
+        geom = max(geom.geoms, key=lambda g: g.area)
+
+    # ungültige Geometrien reparieren
+    if not geom.is_valid:
+        geom = geom.buffer(0)
+        if geom.is_empty:
+            return None, None
+
+    # boundary extrahieren
+    boundary = geom.boundary
+    if boundary.is_empty:
+        # Fallback: nächster Punkt auf Fläche statt auf Boundary
+        try:
+            nearest = nearest_points(point_m, geom)[1]
+            entry_wgs = gpd.GeoSeries([nearest], crs=32633).to_crs(4326).iloc[0]
+            lon = float(entry_wgs.x)
+            lat = float(entry_wgs.y)
+            if np.isnan(lon) or np.isnan(lat):
+                return None, None
+            return lon, lat
+        except Exception:
+            return None, None
+
+    try:
+        proj = boundary.project(point_m)
+        entry_m = boundary.interpolate(proj)
+
+        if entry_m.is_empty:
+            return None, None
+
+        entry_wgs = gpd.GeoSeries([entry_m], crs=32633).to_crs(4326).iloc[0]
+        lon = float(entry_wgs.x)
+        lat = float(entry_wgs.y)
+        if np.isnan(lon) or np.isnan(lat):
+            return None, None
+        return lon, lat
+    except Exception:
+        return None, None
 
 
 def route_task(args):
@@ -137,12 +238,19 @@ if ROUTING_MODE == "area":
     # Dissolve nach objektbeze
     gdf_area = gdf_gruen.to_crs(32633).dissolve(by="objektbeze").reset_index()
 
+    # Debug Geometrien
+    print("→ Prüfe Geometrien nach dissolve()...")
+    print("Anzahl ungültiger Geometrien:", sum(~gdf_area.geometry.is_valid))
+    print("Anzahl leerer Geometrien:", sum(gdf_area.geometry.is_empty))
+    print("Geom-Typ-Übersicht:")
+    print(gdf_area.geometry.geom_type.value_counts())
+
     # Centroid für Kandidatensuche
     gdf_area["centroid_wgs"] = gdf_area.geometry.centroid.to_crs(4326)
 
-    area_ids       = gdf_area["objektbeze"].tolist()
-    area_cent_lat  = gdf_area["centroid_wgs"].y.to_numpy()
-    area_cent_lon  = gdf_area["centroid_wgs"].x.to_numpy()
+    area_ids      = gdf_area["objektbeze"].tolist()
+    area_cent_lat = gdf_area["centroid_wgs"].y.to_numpy()
+    area_cent_lon = gdf_area["centroid_wgs"].x.to_numpy()
 
     print(f"✓ {len(gdf_area)} Grünflächen-Gruppen geladen.")
 
@@ -166,14 +274,12 @@ for addr_idx, row in df_addr.iterrows():
     # POI-MODUS
     # -----------------------------------------------------
     if ROUTING_MODE == "poi":
-        # Luftlinie → nächste Kandidaten
         dists = haversine_np(lat_a, lon_a, lats_dest, lons_dest)
         min_pos = np.argmin(dists)
 
-        lat_d = lats_dest[min_pos]
-        lon_d = lons_dest[min_pos]
+        lat_d = float(lats_dest[min_pos])
+        lon_d = float(lons_dest[min_pos])
 
-        # Wir erzeugen nur *eine* Route (nächster POI)
         tasks.append((lon_a, lat_a, lon_d, lat_d, addr_idx, "poi_target"))
 
     # -----------------------------------------------------
@@ -186,7 +292,6 @@ for addr_idx, row in df_addr.iterrows():
 
         cand_mask = dists <= 1500
         if not cand_mask.any():
-            # Wenn nichts nah genug → dennoch die nächste Fläche
             nearest_idx = np.argmin(dists)
             cand_mask[nearest_idx] = True
 
@@ -200,8 +305,14 @@ for addr_idx, row in df_addr.iterrows():
 
             lon_d, lat_d = nearest_entry_point(pt, area_geom)
 
+            if lon_d is None or lat_d is None:
+                # Nur für Diagnose:
+                # print(f"[WARN] Kein Entry für Fläche {area_id} bei Adresse {addr_idx}.")
+                continue
+
             tasks.append((lon_a, lat_a, lon_d, lat_d, addr_idx, area_id))
 
+print("Anzahl Routing-Tasks:", len(tasks))
 
 # ---------------------------------------------------------
 # PARALLELES ROUTING
@@ -209,47 +320,71 @@ for addr_idx, row in df_addr.iterrows():
 print(f"→ Starte paralleles Routing ({MAX_WORKERS} Threads)…")
 results = defaultdict(dict)
 
-with ThreadPoolExecutor(max_workers=MAX_WORKERS) as ex:
-    future_list = [ex.submit(route_task, t) for t in tasks]
+if ROUTING_ENABLED and len(tasks) > 0:
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as ex:
+        future_list = [ex.submit(route_task, t) for t in tasks]
 
-    for fut in as_completed(future_list):
-        addr_idx, area_id, dist, geom = fut.result()
-        results[addr_idx][area_id] = dist
+        for fut in as_completed(future_list):
+            addr_idx, area_id, dist, geom = fut.result()
+            # dist kann None sein, wir speichern trotzdem
+            results[addr_idx][area_id] = (dist, geom)
 
 print("✓ Routing abgeschlossen.")
-
+print("ORS erfolgreiche Anfragen:", ROUTE_SUCCESS_COUNT)
+print("ORS Fehlanfragen:", ROUTE_ERROR_COUNT)
+print("Anzahl Adressen im results-Objekt:", len(results))
+print(
+    "Adressen mit mindestens einer Distanz (dist != None):",
+    sum(
+        any(d is not None for d in dist_map.values())
+        for dist_map in results.values()
+    )
+)
 
 # ---------------------------------------------------------
 # ERGEBNISSE ZUSAMMENFÜHREN
 # ---------------------------------------------------------
 df_addr[DOMAIN + "_min_distance_m"] = None
-df_addr[DOMAIN + "_route"] = None  # optional: nur die Route zum nächsten
+df_addr[DOMAIN + "_route"] = None
 
-# Schwellenwertspalten initialisieren
 for d in DISTANCE_THRESHOLDS:
     df_addr[f"{DOMAIN}_count_within_{d}m"] = 0
 
-
 for addr_idx in df_addr.index:
-
     dist_map = results.get(addr_idx, {})
 
     if len(dist_map) == 0:
         continue
 
-    # Liste aller Distanzen
-    distances = [v for v in dist_map.values() if v is not None]
+    # Für Statistik: nur Distanzen extrahieren
+    distances_only = [
+        dist_geom[0]
+        for dist_geom in dist_map.values()
+        if dist_geom[0] is not None
+    ]
 
-    if len(distances) == 0:
+    if len(distances_only) == 0:
         continue
 
-    # nächste Grünfläche bestimmen
-    min_dist = min(distances)
-    df_addr.loc[addr_idx, DOMAIN + "_min_distance_m"] = min_dist
+    # Für beste Route: komplette Einträge
+    valid_entries = [
+        (area_id, dist_geom[0], dist_geom[1])
+        for area_id, dist_geom in dist_map.items()
+        if dist_geom[0] is not None
+    ]
 
-    # Counter füllen
+    # Minimale Distanz finden
+    best_area, best_dist, best_geom = min(valid_entries, key=lambda x: x[1])
+
+    # Eintragen
+    df_addr.loc[addr_idx, DOMAIN + "_min_distance_m"] = best_dist
+    df_addr.loc[addr_idx, DOMAIN + "_route"] = best_geom
+
+    # Count innerhalb thresholds
     for d in DISTANCE_THRESHOLDS:
-        df_addr.loc[addr_idx, f"{DOMAIN}_count_within_{d}m"] = sum(dist <= d for dist in distances)
+        df_addr.loc[addr_idx, f"{DOMAIN}_count_within_{d}m"] = sum(
+            dist <= d for dist in distances_only
+        )
 
 
 # ---------------------------------------------------------
