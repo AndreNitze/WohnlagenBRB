@@ -40,7 +40,6 @@ Zusätzlich werden die Cluster über die Anwendung des SKATER-Verfahrens von Ins
 Es wird aber immer auch **Abweichnungen von der subjektiven Bewertung** geben. Diese "gefühlten" Abweichungen können mehrere Gründe haben:
 - Es gibt Kriterien, die die Wohnlage erheblich beeinflussen, aber noch nicht im Modell enthalten sind. In dem Fall können die Daten einfach ergänzt und in das Gewichtungsmodell eingefügt werden.
 - Es treten subjektive Fehlannahmen auf, z. B. ein historisch oder in der Bevölkerung als "schlecht" wahrgenommenes Viertel, das nach sachlichen Kriterien aber aktuell besser bewertet wird.
-- Es gibt harte Grenzen zwischen zwei Adressen: Da die Cluster aufgrund der individuellen Kriterienausprägung der Adressen und nicht aufgrund von (direkten) geografischen Faktoren erstellt werden, sind die Cluster nicht unbedingt zusammenhängende Flächen. Diese Eigenschaft kann nachträglich (auf Kosten der Modellgenauigkeit) hinzugefügt werden, z. B. mit *Spatially Constrained K-Means* oder räumlichen Filtern bzw. Glättung.
 
 Das gewählte Clustering-Verfahren erzeugt insgesamt eine datenbasierte, objektiv überprüfbare und erweiterbare Grundlage für die Einteilung von Wohnlagen. Je mehr relevante Daten eingefügt werden, desto präziser wird das Modell.
 
