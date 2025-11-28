@@ -20,7 +20,7 @@ Das Modell zur Bewertung der Wohnlagen bezieht bereits die folgenden Kriterien e
     - ÖPNV-Taktung der nächsten Haltestelle morgens (6 - 9 Uhr) in Minuten
     - ÖPNV-Taktung der nächsten Haltestelle abends (16 - 19 Uhr) in Minuten
 - Lärm-Index (laut [Lärmkartierung 2022](https://mleuv.brandenburg.de/mleuv/de/umwelt/immissionsschutz/laerm/umgebungslaerm/laermkartierung/#))
-
+- Lage vor bzw. hinter Bahnübergängen vom Stadtzentrum aus
 
 ![Visualisierung des gemessenen Lärm-Index mit Adressen](laerm-index.png)
 Abbildung 1: Visualisierung des gemessenen Lärm-Index mit Adressen
@@ -33,7 +33,9 @@ Die **Kriterien fließen gewichtet in das Modell** ein. Diese Gewichtung ist nur
 
 Zur eigentlichen Bildung von Wohnlagen wird ein **K-Means-Clustering** auf Basis der berechneten Kriterienwerte durchgeführt. Jede Adresse erhält zunächst einen Vektor von standardisierten Z-Scores (z. B. für Zentrumsnähe, Lärmindex, Anzahl erreichbarer Ärzte oder Lebensmittelmärkte). Der K-Means-Algorithmus teilt diese Adresspunkte in eine vorab definierte Zahl von Clustern ein. Jedes Cluster entspricht dabei einer Wohnlagenkategorie, also einem Bereich mit ähnlicher Qualität und vergleichbarer Infrastruktur.
 
-In einer visuellen Plausibilitätsprüfung (vgl. Abbildung 2) ergeben sich gut nachvollziehbare Cluster, wie zum Beispiel "orange" als zentrumsnahe Lage mit sehr guter Nahversorgung in allen definierten Kriterien. Das  blaue Cluster zeigt Adressen in Randlagen. 
+In einer visuellen Plausibilitätsprüfung (vgl. Abbildung 2) ergeben sich gut nachvollziehbare Cluster, wie zum Beispiel "orange" als zentrumsnahe Lage mit sehr guter Nahversorgung in allen definierten Kriterien. Das blaue Cluster zeigt Adressen in Randlagen. 
+
+Zusätzlich werden die Cluster über die Anwendung des SKATER-Verfahrens von Inseln befreit. Dabei entstehen geografisch zusammenhängende Cluster.
 
 Es wird aber immer auch **Abweichnungen von der subjektiven Bewertung** geben. Diese "gefühlten" Abweichungen können mehrere Gründe haben:
 - Es gibt Kriterien, die die Wohnlage erheblich beeinflussen, aber noch nicht im Modell enthalten sind. In dem Fall können die Daten einfach ergänzt und in das Gewichtungsmodell eingefügt werden.
@@ -119,14 +121,8 @@ Im HTTP Body werden die Koordinaten (erste = Startpunkt, zweite = Jahrtausendbr�
 
 
 ## Verbesserungsmöglichkeiten
-- Ergänzung fehlender Daten analog zu bisherigem Vorgehen (Ärztezentren, Grünflächen)
-- Definition und Feinabstimmung des Punktemodells (Gewichtungen), um einen möglichst dauerhaft stabilen Punktwert zu erhalten
-- Ergänzung um "räumliches k-Means", um Glättung zu Quartieren zu ermöglichen
-- Behebung des Problems, dass nicht alle Adressen einen vollständigen Score erhalten und dadurch rausgefiltert und nicht auf der Karte dargestellt werden (vor allem ein Problem in der Peripherie, wenn wenig Infrastruktur im Umkreis ist)
 - Ergänzung einer Spalte "stadtteil" für Visualisierung und Vergleich mit bestehendem Bewertungsmodell anhand der Stadtteile (= "Wie sehr entsprechenden die historischen Stadtteile den objektiven Wohnlagen?")
 - POIs (Points of Interest) wie Schulen, Kindergärten, Haltestellen, Ärzte, Apotheken, Supermärkte und Restaurants könnten zukünftig über die Overpass API von OpenStreetMap ermittelt werden. Dadurch entfällt die manuelle Pflege von CSV-Dateien. Es müssen nur jeweils die aktuellen Daten aus OSM-Karten bezogen werden, die bedarfsgerecht und öffentlich verfügbar gepflegt werden können (z. B., ob Kitas tatsächlich noch geöffnet sind).
-- Wesentliche Faktoren für Wohnlagenbestimmung, die noch nicht einbezogen werden:
-   - Makrolage (Nähe Berlin, Autobahn, Flughafen, Risiko von Naturkatastrophen, Entwicklungsprognose laut [Zukuntsatlas](https://www.prognos.com/de/projekt/zukunftsatlas-2019) oder [Wegweiser Kommune](https://www.wegweiser-kommune.de))
-   - Interne Merkmale der Adressen (Ausstattung, Baujahr, Energieeffizienz, Modernisierung, Denkmalschutz)
-   - Umwelt (Nähe zu Badeseen und Grünflächen, Luftqualität)
+- Mögliche weitere Faktoren für Wohnlagenbestimmung:
+   - Makrolage (Nähe Berlin, Autobahn, Flughafen, Risiko von Naturkatastrophen, Entwicklungsprognose laut [Zukunftsatlas](https://www.prognos.com/de/projekt/zukunftsatlas-2019) oder [Wegweiser Kommune](https://www.wegweiser-kommune.de))
    - Aussicht (Blick auf Wasser, Wald, Stadt, Sehenswürdigkeiten)
