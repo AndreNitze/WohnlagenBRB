@@ -38,8 +38,6 @@ Zur eigentlichen Bildung von Wohnlagen wird ein **K-Means-Clustering** auf Basis
 
 In einer visuellen Plausibilitätsprüfung (vgl. Abbildung 2) ergeben sich gut nachvollziehbare Cluster, wie zum Beispiel "orange" als zentrumsnahe Lage mit sehr guter Nahversorgung in allen definierten Kriterien. Das blaue Cluster zeigt Adressen in Randlagen. 
 
-Zusätzlich werden die Cluster über die Anwendung des SKATER-Verfahrens von Inseln befreit. Dabei entstehen geografisch zusammenhängende Cluster.
-
 Es wird aber immer auch **Abweichnungen von der subjektiven Bewertung** geben. Diese "gefühlten" Abweichungen können mehrere Gründe haben:
 - Es gibt Kriterien, die die Wohnlage erheblich beeinflussen, aber noch nicht im Modell enthalten sind. In dem Fall können die Daten einfach ergänzt und in das Gewichtungsmodell eingefügt werden.
 - Es treten subjektive Fehlannahmen auf, z. B. ein historisch oder in der Bevölkerung als "schlecht" wahrgenommenes Viertel, das nach sachlichen Kriterien aber aktuell besser bewertet wird.
@@ -54,6 +52,12 @@ Die Wahl der Clusteranzahl erfolgt nicht willkürlich, sondern orientiert sich a
 ![Silhouette-Score (Beispiel) für verschiedene Cluster-Anzahl](silhouette-example.png)
 Abbildung 4: Silhouette-Score (Beispiel) für verschiedene Cluster-Anzahl
 
+### Glättung mit SKATER
+Um sicherzustellen, dass die resultierenden Wohnlagen geografisch zusammenhängend sind, wird das SKATER-Verfahren (Spatial 'K'luster Analysis by Tree Edge Removal) angewendet. Dieses Verfahren analysiert die räumliche Verteilung der Adressen und entfernt "Inseln" von Adressen, die isoliert in einem anderen Cluster liegen. Dadurch entstehen klar abgegrenzte Wohnlagen, die besser mit der städtischen Realität übereinstimmen.
+
+![Beispielhafte Wohnlagen mit SKATER-Bereinigung mit 7 Clustern](skater.png)
+Abbildung 5: Beispielhafte Wohnlagen mit SKATER-Bereinigung mit 7 Clustern
+
 ### Validierung
 Um die Qualität der Ergebnisse zu prüfen, werden verschiedene Validierungsschritte genutzt:
 
@@ -64,7 +68,7 @@ Um die Qualität der Ergebnisse zu prüfen, werden verschiedene Validierungsschr
 - Geografische Kohärenz: Da Wohnlagen räumlich zusammenhängend sein sollten, wird zusätzlich kontrolliert, ob die resultierenden Cluster zusammenhängende Flächen bilden oder ob Adressen „versprengt“ erscheinen.
 
 ![Beispielhafte Korrelation zwischen Kriterien](correlation-example.png)
-Abbildung 5: Beispielhafte Korrelationen zwischen Kriterien
+Abbildung 6: Beispielhafte Korrelationen zwischen Kriterien
 
 ### Einschränkung der Validität
 Die Bewertung der Merkmale erfolgt über Z-Scores, also standardisierte Abweichungen vom Mittelwert. Dadurch ist die Einordnung relativ zur jeweils betrachteten Gesamtheit: Eine Adresse wird besser bewertet, wenn sie im Vergleich zu anderen Adressen günstigere Werte aufweist.
@@ -85,7 +89,7 @@ Weiterhin gibt es einige Hilfs-Skripte zur Automatisierung der Datenvorverarbeit
 Die gezeigten Diagramme und interaktiven Karten können alle mithilfe des Notebooks erzeugt werden.
 
 ![Kartenanwendung zur Darstellung einer Adresse mit berechneten Wegen zu den POIs](map.png)  
-Abbildung 6: Kartenanwendung zur Darstellung einer Adresse mit ermittelten Wegen zu den POIs
+Abbildung 7: Kartenanwendung zur Darstellung einer Adresse mit ermittelten Wegen zu den POIs
 
 ## Geocoding
 Für die Geocodierung der Adressen wird ein Nominatim-Server in einem lokalen Docker-Container (s. [Anleitung](https://hub.docker.com/r/mediagis/nominatim)) verwendet, sodass Anfragen in dieser Art gestellt werden können:
