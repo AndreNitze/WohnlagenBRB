@@ -27,6 +27,9 @@ Abbildung 1: Visualisierung des gemessenen Lärm-Index mit Adressen
 
 Das Modell kann beliebig um neue Kriterien erweitert werden. Denkbar sind zum Beispiel auch neue Kriterien wie "zwischen der Adresse und dem Zentrum gibt es einen Bahnübergang" oder Ähnliches. Dadurch kann die Trennschärfe des Modells verbessert werden, was anhand der Gütemaße (s.u.) sichtbar werden sollte.
 
+![Visualisierung der Querung von Bahnübergängen (Beispiel)](bahn.png)
+Abbildung 2: Visualisierung der Querung von Bahnübergängen (Beispiel
+
 Die **Kriterien fließen gewichtet in das Modell** ein. Diese Gewichtung ist nur vorläufig definiert und sollte für den langfristigen Einsatz möglichst festgeschrieben werden.
 
 ### Clustering-Ansatz
@@ -44,12 +47,12 @@ Es wird aber immer auch **Abweichnungen von der subjektiven Bewertung** geben. D
 Das gewählte Clustering-Verfahren erzeugt insgesamt eine datenbasierte, objektiv überprüfbare und erweiterbare Grundlage für die Einteilung von Wohnlagen. Je mehr relevante Daten eingefügt werden, desto präziser wird das Modell.
 
 ![Beispiel-Clustering von Brandenburg an der Havel mit einigen Kriterien](cluster-example.png)
-Abbildung 2: Beispielhaftes Clustering (K-Means) von Brandenburg an der Havel mit Kitas, Schulen, Haltestellen, Supermärkten und Zentrumsnähe als Kriterien.
+Abbildung 3: Beispielhaftes Clustering (K-Means) von Brandenburg an der Havel mit Kitas, Schulen, Haltestellen, Supermärkten und Zentrumsnähe als Kriterien.
 
 Die Wahl der Clusteranzahl erfolgt nicht willkürlich, sondern orientiert sich an **statistischen Gütekriterien** (z. B. Elbow-Methode oder Silhouette-Score). So wird sichergestellt, dass die Cluster trennscharf genug sind und die zugrunde liegenden Unterschiede in den Adressdaten tatsächlich widerspiegeln.
 
 ![Silhouette-Score (Beispiel) für verschiedene Cluster-Anzahl](silhouette-example.png)
-Abbildung 3: Silhouette-Score (Beispiel) für verschiedene Cluster-Anzahl
+Abbildung 4: Silhouette-Score (Beispiel) für verschiedene Cluster-Anzahl
 
 ### Validierung
 Um die Qualität der Ergebnisse zu prüfen, werden verschiedene Validierungsschritte genutzt:
@@ -61,7 +64,7 @@ Um die Qualität der Ergebnisse zu prüfen, werden verschiedene Validierungsschr
 - Geografische Kohärenz: Da Wohnlagen räumlich zusammenhängend sein sollten, wird zusätzlich kontrolliert, ob die resultierenden Cluster zusammenhängende Flächen bilden oder ob Adressen „versprengt“ erscheinen.
 
 ![Beispielhafte Korrelation zwischen Kriterien](correlation-example.png)
-Abbildung 4: Beispielhafte Korrelationen zwischen Kriterien
+Abbildung 5: Beispielhafte Korrelationen zwischen Kriterien
 
 ### Einschränkung der Validität
 Die Bewertung der Merkmale erfolgt über Z-Scores, also standardisierte Abweichungen vom Mittelwert. Dadurch ist die Einordnung relativ zur jeweils betrachteten Gesamtheit: Eine Adresse wird besser bewertet, wenn sie im Vergleich zu anderen Adressen günstigere Werte aufweist.
@@ -82,7 +85,7 @@ Weiterhin gibt es einige Hilfs-Skripte zur Automatisierung der Datenvorverarbeit
 Die gezeigten Diagramme und interaktiven Karten können alle mithilfe des Notebooks erzeugt werden.
 
 ![Kartenanwendung zur Darstellung einer Adresse mit berechneten Wegen zu den POIs](map.png)  
-Abbildung 5: Kartenanwendung zur Darstellung einer Adresse mit ermittelten Wegen zu den POIs
+Abbildung 6: Kartenanwendung zur Darstellung einer Adresse mit ermittelten Wegen zu den POIs
 
 ## Geocoding
 Für die Geocodierung der Adressen wird ein Nominatim-Server in einem lokalen Docker-Container (s. [Anleitung](https://hub.docker.com/r/mediagis/nominatim)) verwendet, sodass Anfragen in dieser Art gestellt werden können:
