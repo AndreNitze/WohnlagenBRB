@@ -118,3 +118,9 @@ def min_max(series, invert=False):
     if invert:
         s = -s
     return (s - s.min()) / (s.max() - s.min())
+
+def clean_index_cols(df):
+    cols = [c for c in df.columns if c.startswith("index_")]
+    if cols:
+        df.drop(columns=cols, inplace=True, errors="ignore")
+    return df
