@@ -344,7 +344,7 @@ print(
 # ---------------------------------------------------------
 # ERGEBNISSE ZUSAMMENFÜHREN
 # ---------------------------------------------------------
-df_addr[DOMAIN + "_min_distance_m"] = None
+df_addr[DOMAIN + "_min_distance"] = None
 df_addr[DOMAIN + "_route"] = None
 
 for d in DISTANCE_THRESHOLDS:

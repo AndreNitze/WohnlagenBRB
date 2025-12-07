@@ -114,7 +114,7 @@ for i, a in df_addr.iterrows():
 
 # ------------------------------------------------------------------
 # 3) Ergebnis anfügen & speichern
-df_addr["shop_min_distance_m"]     = nearest_dist
+df_addr["shop_min_distance"]     = nearest_dist
 df_addr["shops_500m_count"]  = shops_500m
 df_addr["shops_800m_count"]  = shops_800m
 
