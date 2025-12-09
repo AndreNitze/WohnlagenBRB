@@ -14,11 +14,7 @@ from shapely.ops import nearest_points
 # MODUS-KONFIGURATION
 # ---------------------------------------------------------
 # ROUTING_MODE = "poi"     # Routing zu Punktzielen
-ROUTING_MODE = "area"      # Routing zu Grünflächen (Polygonflächen)
-
-# Wenn AREA:
-AREA_PATH = "data/Grünflächen_Verkehrszeichen/20251029_Vegetation_KSP_GP_31.shp"
-
+ROUTING_MODE = "area"      # Routing zu Flächen
 # ---------------------------------------------------------
 # ORS KONFIGURATION
 # ---------------------------------------------------------
@@ -30,7 +26,8 @@ ORS_API_KEY = "your_api_key_here"
 # ---------------------------------------------------------
 DOMAIN            = "gruen"
 CSV_ADDRESSES     = "out/adressen_geocoded.csv"
-CSV_DESTINATIONS  = "out/" + DOMAIN + "_geocoded.csv"   # nur POI-Modus
+CSV_DESTINATIONS  = "out/" + DOMAIN + "_geocoded.csv" # Wenn POI-Modus
+AREA_PATH = "data/Grünflächen_Verkehrszeichen/20251029_Vegetation_KSP_GP_31.shp" # Wenn AREA-Modus
 CSV_OUTPUT        = "out/adressen_mit_" + DOMAIN + "_routen.csv"
 
 # ---------------------------------------------------------
@@ -377,7 +374,7 @@ for addr_idx in df_addr.index:
     best_area, best_dist, best_geom = min(valid_entries, key=lambda x: x[1])
 
     # Eintragen
-    df_addr.loc[addr_idx, DOMAIN + "_min_distance_m"] = best_dist
+    df_addr.loc[addr_idx, DOMAIN + "_min_distance"] = best_dist
     df_addr.loc[addr_idx, DOMAIN + "_route"] = best_geom
 
     # Count innerhalb thresholds
