@@ -26,6 +26,8 @@ dependencies = [
     "scipy==1.16.3",
     "scipy-stubs==1.16.3.1",
     "seaborn>=0.13.2",
+    "selenium>=4.40.0",
     "shapely>=2.1.1",
     "spopt>=0.7.0",
+    "webdriver-manager>=4.0.2",
 ]

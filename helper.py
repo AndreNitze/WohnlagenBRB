@@ -3,6 +3,7 @@ import geopandas as gpd
 import folium
 from shapely import wkt
 from shapely.geometry import Point
+import ast
 
 HAUSNUMMERZUSATZ = "HsnrZus"
 HAUSNUMMER = "Hsnr"
@@ -124,3 +125,53 @@ def clean_index_cols(df):
     if cols:
         df.drop(columns=cols, inplace=True, errors="ignore")
     return df
+
+def add_medcenter_markers(map_obj, csv_path, fach_dict, color="red", icon="staff-snake", layer_name="Medizinische Zentren"):
+    df = pd.read_csv(csv_path)
+
+    layer = folium.FeatureGroup(name=layer_name)
+    layer.add_to(map_obj)
+
+    for _, row in df.iterrows():
+        lat, lon = row["lat"], row["lon"]
+        if pd.isna(lat) or pd.isna(lon):
+            continue
+
+        # Arztliste parsen
+        arzt_keys = row.get("arzt_keys_100m", "[]")
+        if isinstance(arzt_keys, str):
+            arzt_keys = ast.literal_eval(arzt_keys)
+
+        # Popup zusammenbauen
+        lines = []
+
+        if bool(row.get("is_med_center", False)):
+            lines.append(f"<b>Medizinisches Zentrum<br>{row.get('Strassenname','')}</b><br>")
+
+        # Apotheke
+        name_ap = str(row.get("Name_Apotheke", "")).strip()
+        if name_ap:
+            lines.append(f"🏥 {name_ap}<br>")
+
+        # Anzahl Ärzte
+        if len(arzt_keys) > 0:
+            lines.append(f"<br><b>{len(arzt_keys)} Arztpraxen im 100 m Radius:</b><br>")
+
+        # Ärzte + Fachrichtung
+        for arzt in arzt_keys:
+            fach = fach_dict.get(arzt, "(Fachrichtung unbekannt)")
+            lines.append(f"{arzt} – {fach}<br>")
+
+        popup_html = "".join(lines)
+
+        # Icon wählen
+        ico = folium.Icon(color=color, icon=icon, prefix="fa")
+
+        marker = folium.Marker(
+            location=[lat, lon],
+            tooltip=row.get("Strassenname", "MedZentrum"),
+            icon=ico
+        ).add_to(layer)
+
+        # Popup breiter machen
+        marker.add_child(folium.Popup(popup_html, max_width=450))
