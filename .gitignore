@@ -1,4 +1,10 @@
 /.idea
 /.venv
+/.venv1
+/.pynb_checkpoints
 /data
 /__pycache__
+/out
+/plots
+/cache
+/maps
