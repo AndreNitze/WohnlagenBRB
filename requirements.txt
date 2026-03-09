@@ -11,6 +11,8 @@ folium~=0.20.0
 requests~=2.32.4
 scipy~=1.16.0
 scikit-learn~=1.7.1
+umap-learn~=0.5.7
 geopandas~=1.1.1
 branca~=0.8.1
 shapely~=2.1.1
+pyproj

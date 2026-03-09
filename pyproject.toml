@@ -29,5 +29,6 @@ dependencies = [
     "selenium>=4.40.0",
     "shapely>=2.1.1",
     "spopt>=0.7.0",
+    "umap-learn>=0.5.7",
     "webdriver-manager>=4.0.2",
 ]
