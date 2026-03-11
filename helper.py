@@ -9,10 +9,38 @@ HAUSNUMMERZUSATZ = "HsnrZus"
 HAUSNUMMER = "Hsnr"
 STRASSENNAME = "Straßenname"
 
+def _first_scalar(v):
+    """Gibt aus pandas-Containern den ersten brauchbaren Skalar zurück."""
+    if isinstance(v, (pd.Series, pd.Index)):
+        for item in v.tolist():
+            if not _is_missing(item):
+                return item
+        return None
+    return v
+
+def _is_missing(v) -> bool:
+    """Robuster Missing-Check für Skalare und pandas-Objekte."""
+    v = _first_scalar(v)
+    if v is None:
+        return True
+    return bool(pd.isna(v))
+
+
+def _truthy(v) -> bool:
+    """Robuster Bool-Check, auch wenn versehentlich eine Series ankommt."""
+    if isinstance(v, (pd.Series, pd.Index)):
+        return any(_truthy(item) for item in v.tolist())
+    v = _first_scalar(v)
+    if _is_missing(v):
+        return False
+    return bool(v)
+
+
 def make_merge_addr(row):
     s = str(row[STRASSENNAME]).strip().lower()
     hn = str(row[HAUSNUMMER]).strip().lower()
-    hzusatz = str(row.get(HAUSNUMMERZUSATZ, '')).strip().lower() if HAUSNUMMERZUSATZ in row and not pd.isna(row.get(HAUSNUMMERZUSATZ, None)) else ""
+    hzusatz_raw = row.get(HAUSNUMMERZUSATZ, "")
+    hzusatz = str(hzusatz_raw).strip().lower() if HAUSNUMMERZUSATZ in row and not _is_missing(hzusatz_raw) else ""
     if hzusatz and hzusatz != "nan":
         hn += hzusatz
     adr = f"{s} {hn}".replace("  ", " ").strip()
@@ -79,7 +107,7 @@ def add_markers_from_csv(
         # Name aus der ersten nicht-leeren 'Name_'-Spalte ableiten
         name_value = ""
         for nc in name_cols:
-            val = str(row.get(nc, "") or "").strip()
+            val = s(row.get(nc, ""))
             if val:
                 name_value = val
                 break
@@ -107,7 +135,8 @@ def add_markers_from_csv(
 
 def s(v) -> str:
     """NaN/None -> '', sonst getrimmt als String."""
-    if v is None or pd.isna(v):
+    v = _first_scalar(v)
+    if _is_missing(v):
         return ""
     # manche CSVs haben das Literal "nan" als Text:
     if isinstance(v, str) and v.strip().lower() == "nan":
@@ -145,7 +174,7 @@ def add_medcenter_markers(map_obj, csv_path, fach_dict, color="red", icon="staff
         # Popup zusammenbauen
         lines = []
 
-        if bool(row.get("is_med_center", False)):
+        if _truthy(row.get("is_med_center", False)):
             lines.append(f"<b>Medizinisches Zentrum<br>{row.get('Strassenname','')}</b><br>")
 
         # Apotheke
