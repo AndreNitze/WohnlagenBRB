@@ -1,7 +1,7 @@
 import pandas as pd
 from pyproj import Transformer
 
-INPUT_CSV = "data/2026_Haltestellen.csv"
+INPUT_CSV = "out/haltestellen_geocoded.csv"
 OUTPUT_CSV = "out/haltestellen_geocoded.csv"
 X_COL = "x"
 Y_COL = "y"
@@ -15,9 +15,18 @@ transformer = Transformer.from_crs("EPSG:25833", "EPSG:4326", always_xy=True)
 
 lon, lat = transformer.transform(df[X_COL].values, df[Y_COL].values)
 
-df["lon"] = lon
-df["lat"] = lat
-df["geometry"] = [f"POINT({x} {y})" for x, y in zip(lon, lat)]
+if "lon" not in df.columns:
+    df["lon"] = pd.NA
+if "lat" not in df.columns:
+    df["lat"] = pd.NA
+
+df["lon"] = pd.to_numeric(df["lon"].astype(str).str.replace(",", ".", regex=False), errors="coerce")
+df["lat"] = pd.to_numeric(df["lat"].astype(str).str.replace(",", ".", regex=False), errors="coerce")
+
+missing_coords_mask = df["lon"].isna() & df["lat"].isna()
+df.loc[missing_coords_mask, "lon"] = lon[missing_coords_mask]
+df.loc[missing_coords_mask, "lat"] = lat[missing_coords_mask]
+df["geometry"] = [f"POINT({x} {y})" for x, y in zip(df["lon"], df["lat"])]
 
 df.to_csv(OUTPUT_CSV, sep=",", index=False)
 print(df.head())
