@@ -1,7 +1,7 @@
 /.idea
 /.venv
 /.venv1
-/.pynb_checkpoints
+/.ipynb_checkpoints
 /data
 /__pycache__
 /out
