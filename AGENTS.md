@@ -5,7 +5,7 @@ This repository is centered on notebook-driven analysis for housing-location sco
 
 - Main notebooks: `wohnlagen.ipynb` (primary workflow), `wohnlagen_2026.ipynb`, `public-transport.ipynb`, `laerm.ipynb`
 - Python helpers/scripts: `helper.py`, `geocoder.py`, `routing.py`, `routing2.py`, `medizinische-zentren.py`, `einzelhandel-adressen.py`
-- Map export utility: `maps/html_to_png.py`
+- Map export utility: `html-to-png.py`
 - Input data: `data/` (CSV, SHP, GPKG, GTFS)
 - Generated outputs: `out/` (geocoded/routing CSVs), `cache/` (API cache artifacts)
 
@@ -17,7 +17,7 @@ Keep new processing scripts at repository root or in `maps/` if map-render relat
 - `jupyter lab` starts the notebook environment.
 - `python geocoder.py` geocodes configured source CSVs (edit constants at file top first).
 - `python routing.py` computes route distances and writes enriched CSV outputs.
-- `python maps/html_to_png.py --start 4 --end 12` renders cluster HTML maps to PNG screenshots.
+- `python html-to-png.py` renders HTML maps from `maps/` to PNG screenshots.
 
 Run commands from the repository root so relative paths like `data/...` and `out/...` resolve correctly.
 
