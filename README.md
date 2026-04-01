@@ -36,6 +36,12 @@ Die **Kriterien fließen gewichtet in das Modell** ein. Diese Gewichtung ist nur
 
 Zur eigentlichen Bildung von Wohnlagen wird ein **K-Means-Clustering** auf Basis der berechneten Kriterienwerte durchgeführt. Jede Adresse erhält zunächst einen Vektor von standardisierten Z-Scores (z. B. für Zentrumsnähe, Lärmindex, Anzahl erreichbarer Ärzte oder Lebensmittelmärkte). Der K-Means-Algorithmus teilt diese Adresspunkte in eine vorab definierte Zahl von Clustern ein. Jedes Cluster entspricht dabei einer Wohnlagenkategorie, also einem Bereich mit ähnlicher Qualität und vergleichbarer Infrastruktur.
 
+Im Notebook werden diese Ergebnisse inzwischen in mehreren, klar getrennten Varianten geführt:
+- **K-Means Original**: reine Clusterung auf Adressebene, ohne Blockglättung
+- **K-Means Blockglättung**: Mehrheitszuordnung innerhalb eines Blocks, um die Adress-Cluster auf Blockebene vergleichen zu können
+- **SKATER Adressen**: optionaler älterer Glättungsansatz auf Adressebene, primär für Vergleichszwecke
+- **SKATER Blöcke**: neuer flächenbasierter Ansatz auf aggregierten Blockdaten
+
 In einer visuellen Plausibilitätsprüfung (vgl. Abbildung 2) ergeben sich gut nachvollziehbare Cluster, wie zum Beispiel "orange" als zentrumsnahe Lage mit sehr guter Nahversorgung in allen definierten Kriterien. Das blaue Cluster zeigt Adressen in Randlagen. 
 
 Es wird aber immer auch **Abweichnungen von der subjektiven Bewertung** geben. Diese "gefühlten" Abweichungen können mehrere Gründe haben:
@@ -53,7 +59,9 @@ Die Wahl der Clusteranzahl erfolgt nicht willkürlich, sondern orientiert sich a
 Abbildung 4: Silhouette-Score (Beispiel) für verschiedene Cluster-Anzahl
 
 ### Glättung mit SKATER
-Um sicherzustellen, dass die resultierenden Wohnlagen geografisch zusammenhängend sind, wird das SKATER-Verfahren (Spatial 'K'luster Analysis by Tree Edge Removal) angewendet. Dieses Verfahren analysiert die räumliche Verteilung der Adressen und entfernt "Inseln" von Adressen, die isoliert in einem anderen Cluster liegen. Dadurch entstehen klar abgegrenzte Wohnlagen, die besser mit der städtischen Realität übereinstimmen.
+Im aktuellen Stand werden zwei SKATER-Perspektiven unterschieden. Der ältere Ansatz arbeitet adressbasiert und kann im Notebook gezielt ein- oder ausgeschaltet werden, ist aber rechenintensiv und dient vor allem dem Vergleich. Der neuere Standardansatz arbeitet auf **Blockebene**: Dafür werden die Modellmerkmale zunächst auf Blockgrenzen aggregiert und anschließend mit SKATER zu zusammenhängenden Flächenclustern geglättet. Die so erzeugten Block-Cluster werden danach wieder den enthaltenen Adressen zugeordnet.
+
+Dadurch lassen sich Original-K-Means, adressbasierte Glättung und blockbasierte Glättung direkt miteinander vergleichen, ohne dass das ursprüngliche Clustering überschrieben wird.
 
 ![Beispielhafte Wohnlagen mit SKATER-Bereinigung mit 7 Clustern](skater.png)
 Abbildung 5: Beispielhafte Wohnlagen mit SKATER-Bereinigung mit 7 Clustern
