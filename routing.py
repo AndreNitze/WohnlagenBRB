@@ -323,8 +323,15 @@ if ROUTING_MODE == "poi":
     lons_dest = df_dest["lon"].to_numpy()
     dest_ids  = df_dest.index.to_numpy()
 
+    dest_name_col = None
+    for candidate in ["Name_Haltestelle", "name", "Name", "Adresse_merge"]:
+        if candidate in df_dest.columns:
+            dest_name_col = candidate
+            break
+
 else:
     df_dest = None
+    dest_name_col = None
 
 
 # ---------------------------------------------------------
@@ -463,6 +470,10 @@ print(
 # ---------------------------------------------------------
 df_addr[DOMAIN + "_min_distance"] = None
 df_addr[DOMAIN + "_route"] = None
+df_addr[DOMAIN + "_target_id"] = None
+df_addr[DOMAIN + "_target_name"] = None
+df_addr[DOMAIN + "_target_lat"] = None
+df_addr[DOMAIN + "_target_lon"] = None
 
 for d in DISTANCE_THRESHOLDS:
     df_addr[f"{DOMAIN}_count_within_{d}m"] = 0
@@ -496,6 +507,16 @@ for addr_idx in df_addr.index:
     # Eintragen
     df_addr.loc[addr_idx, DOMAIN + "_min_distance"] = best_dist
     df_addr.loc[addr_idx, DOMAIN + "_route"] = best_geom
+
+    if ROUTING_MODE == "poi" and str(best_area).startswith("poi_"):
+        dest_idx = int(str(best_area).split("_", 1)[1])
+        df_addr.loc[addr_idx, DOMAIN + "_target_id"] = dest_idx
+        df_addr.loc[addr_idx, DOMAIN + "_target_lat"] = df_dest.loc[dest_idx, "lat"]
+        df_addr.loc[addr_idx, DOMAIN + "_target_lon"] = df_dest.loc[dest_idx, "lon"]
+        if dest_name_col is not None:
+            df_addr.loc[addr_idx, DOMAIN + "_target_name"] = df_dest.loc[dest_idx, dest_name_col]
+    else:
+        df_addr.loc[addr_idx, DOMAIN + "_target_id"] = best_area
 
     # Count innerhalb thresholds
     for d in DISTANCE_THRESHOLDS:
