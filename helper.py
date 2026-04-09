@@ -39,8 +39,8 @@ def _truthy(v) -> bool:
 def make_merge_addr(row):
     s = str(row[STRASSENNAME]).strip().lower()
     hn = str(row[HAUSNUMMER]).strip().lower()
-    hzusatz_raw = row.get(HAUSNUMMERZUSATZ, "")
-    hzusatz = str(hzusatz_raw).strip().lower() if HAUSNUMMERZUSATZ in row and not _is_missing(hzusatz_raw) else ""
+    hzusatz_raw = row.get(HAUSNUMMERZUSATZ, row.get("Hsnrzus", ""))
+    hzusatz = str(hzusatz_raw).strip().lower() if not _is_missing(hzusatz_raw) else ""
     if hzusatz and hzusatz != "nan":
         hn += hzusatz
     adr = f"{s} {hn}".replace("  ", " ").strip()
