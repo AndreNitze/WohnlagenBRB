@@ -34,9 +34,9 @@ CSV_OUTPUT        = "out/adressen_mit_" + DOMAIN + "_routen.csv"
 # ---------------------------------------------------------
 # PARAMETER
 # ---------------------------------------------------------
-DISTANCE_THRESHOLDS = [500, 800, 1000]     # Zaehlradius
+DISTANCE_THRESHOLDS = [500]     # Zaehlradius
 HAVERSINE_LIMIT_M   = 2000                 # Kandidatensuche
-MAX_WORKERS         = 16                   # parallele Threads
+MAX_WORKERS         = 8                   # parallele Threads
 ROUTING_ENABLED     = True                 # debug/skip moeglich
 ORS_TIMEOUT_S       = 15                   # request timeout
 ORS_RETRY_RADII_M   = [None, 1200, 2500]   # Retry bei ORS 2010 (Snapping)
@@ -298,6 +298,23 @@ def route_task(args):
     return addr_idx, area_id, dist, geom
 
 
+def print_routing_progress(done_count, total_count, addr_idx, area_id, dist):
+    """Aktualisiert eine kompakte Statuszeile fuer den Routing-Fortschritt."""
+    if total_count <= 0:
+        return
+
+    if dist is None:
+        dist_text = "n/a"
+    else:
+        dist_text = f"{dist:.1f} m"
+
+    progress_text = (
+        f"[{done_count}/{total_count}] Routed: "
+        f"addr_idx={addr_idx} -> {area_id} ({dist_text})"
+    )
+    print(progress_text, end="\r", flush=True)
+
+
 # ---------------------------------------------------------
 # DATEN LADEN: ADRESSEN
 # ---------------------------------------------------------
@@ -447,11 +464,22 @@ results = defaultdict(dict)
 if ROUTING_ENABLED and len(tasks) > 0:
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as ex:
         future_list = [ex.submit(route_task, t) for t in tasks]
+        total_futures = len(future_list)
+        completed_futures = 0
 
         for fut in as_completed(future_list):
             addr_idx, area_id, dist, geom = fut.result()
             # dist kann None sein, wir speichern trotzdem
             results[addr_idx][area_id] = (dist, geom)
+            completed_futures += 1
+            print_routing_progress(
+                completed_futures,
+                total_futures,
+                addr_idx,
+                area_id,
+                dist,
+            )
+    print()
 
 print("Routing abgeschlossen.")
 print("ORS erfolgreiche Anfragen:", ROUTE_SUCCESS_COUNT)

@@ -1,5 +1,7 @@
-﻿import time
+﻿import csv
+import time
 import urllib.parse
+from io import StringIO
 
 import pandas as pd
 import requests
@@ -12,7 +14,7 @@ COUNTRY = "Brandenburg"  # Additional indicator to narrow down geocoding results
 ZIP_CODE = "14770"  # Additional indicator to narrow down geocoding results
 
 # ----- Online Service - Fair Use Policy beachten! ------
-# NOMINATIM_URL = "http://localhost:8081/search"
+#NOMINATIM_URL = "http://localhost:8080/search"
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
 
 # ---- Parameter fuer faire Nutzung ----
@@ -25,7 +27,9 @@ RETRY_BACKOFF_SECONDS = 2
 def get_first_value(row, keys, default=""):
     for key in keys:
         if key in row and pd.notna(row[key]):
-            return row[key]
+            value = row[key]
+            if str(value).strip().lower() not in {"", "nan", "none"}:
+                return value
     return default
 
 
@@ -84,6 +88,30 @@ def build_address(row):
     parts = [street, hn, CITY]
     parts = [p for p in parts if p and p != "nan"]
     return [", ".join(parts)]
+
+
+def load_input_csv(path):
+    """Liest Haltestellen-/Adress-CSV robust mit Komma oder Semikolon ein."""
+    df = pd.read_csv(path, encoding="utf-8-sig", sep=None, engine="python")
+
+    # Fallback fuer Altdateien, bei denen die komplette CSV-Zeile in Spalte 1 steckt.
+    if len(df.columns) == 1:
+        first_col = df.columns[0]
+        parsed_header = next(csv.reader(StringIO(first_col)))
+        if len(parsed_header) > 1:
+            parsed_rows = []
+            for value in df.iloc[:, 0].fillna("").astype(str):
+                parsed = next(csv.reader(StringIO(value)))
+                if len(parsed) > len(parsed_header):
+                    overflow = len(parsed) - len(parsed_header)
+                    parsed = [",".join(parsed[:overflow + 1])] + parsed[overflow + 1:]
+                if len(parsed) == len(parsed_header):
+                    parsed_rows.append(parsed)
+
+            if parsed_rows:
+                df = pd.DataFrame(parsed_rows, columns=parsed_header)
+
+    return df
 
 
 def make_merge_addr(row):
@@ -153,35 +181,38 @@ def geocode_address(address_list):
     }
 
 
-# ------------------- Hauptlogik -------------------
-df = pd.read_csv(CSV_EINGABE, encoding="utf-8-sig", sep=";")
-df["Adresse_query"] = df.apply(build_address, axis=1)
-df["Adresse_merge"] = df.apply(make_merge_addr, axis=1)
+def main():
+    df = load_input_csv(CSV_EINGABE)
+    df["Adresse_query"] = df.apply(build_address, axis=1)
+    df["Adresse_merge"] = df.apply(make_merge_addr, axis=1)
 
-for i, row in df.iterrows():
-    address_list = row["Adresse_query"]
-    if not isinstance(address_list, list):
-        address_list = [str(address_list)]
+    for i, row in df.iterrows():
+        address_list = row["Adresse_query"]
+        if not isinstance(address_list, list):
+            address_list = [str(address_list)]
 
-    result = geocode_address(address_list)
+        result = geocode_address(address_list)
 
-    for key, value in result.items():
-        df.loc[i, key] = value
+        for key, value in result.items():
+            df.loc[i, key] = value
 
-    try:
-        lat = float(result["lat"])
-        lon = float(result["lon"])
-        if pd.notna(lat) and pd.notna(lon):
-            # GeoPandas-Standard: WKT
-            geometry = f"POINT ({lon} {lat})"
-        else:
+        try:
+            lat = float(result["lat"])
+            lon = float(result["lon"])
+            if pd.notna(lat) and pd.notna(lon):
+                # GeoPandas-Standard: WKT
+                geometry = f"POINT ({lon} {lat})"
+            else:
+                geometry = None
+        except (TypeError, ValueError):
             geometry = None
-    except (TypeError, ValueError):
-        geometry = None
 
-    df.loc[i, "geometry"] = geometry
-    print(f"[{i + 1}/{len(df)}] Geocoded: {address_list[0]} -> {result['lat']}, {result['lon']} ({result['type']})")
+        df.loc[i, "geometry"] = geometry
+        print(f"[{i + 1}/{len(df)}] Geocoded: {address_list[0]} -> {result['lat']}, {result['lon']} ({result['type']})")
 
-# Ergebnis speichern
-df.to_csv(CSV_AUSGABE, index=False, encoding="utf-8")
-print(f"Geocoding abgeschlossen. Datei gespeichert als: {CSV_AUSGABE}")
+    df.to_csv(CSV_AUSGABE, index=False, encoding="utf-8")
+    print(f"Geocoding abgeschlossen. Datei gespeichert als: {CSV_AUSGABE}")
+
+
+if __name__ == "__main__":
+    main()
