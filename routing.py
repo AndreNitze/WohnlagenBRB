@@ -26,7 +26,7 @@ ORS_API_KEY = "your_api_key_here"
 # ---------------------------------------------------------
 # DATEIEN
 # ---------------------------------------------------------
-DOMAIN            = "haltestellen"
+DOMAIN            = "einzelhandel"
 CSV_ADDRESSES     = "out/adressen_geocoded.csv"
 CSV_DESTINATIONS  = "out/" + DOMAIN + "_geocoded.csv" # Wenn POI-Modus
 AREA_PATH         = "data/Grünflächen_Verkehrszeichen/20251029_Vegetation_KSP_GP_31.shp" # Wenn AREA-Modus
@@ -37,7 +37,7 @@ CSV_OUTPUT        = "out/adressen_mit_" + DOMAIN + "_routen.csv"
 # ---------------------------------------------------------
 DISTANCE_THRESHOLDS = [500]     # Zaehlradius
 HAVERSINE_LIMIT_M   = 2000                 # Kandidatensuche
-MAX_WORKERS         = 16                   # parallele Threads
+MAX_WORKERS         = 8                   # parallele Threads
 ROUTING_ENABLED     = True                 # debug/skip moeglich
 ORS_TIMEOUT_S       = 15                   # request timeout
 ORS_RETRY_RADII_M   = [None, 1200, 2500]   # Retry bei ORS 2010 (Snapping)
@@ -412,6 +412,7 @@ else:
 # ROUTING-TASKS ERZEUGEN
 # ---------------------------------------------------------
 tasks = []   # (lon_a, lat_a, lon_d, lat_d, address_index, target_id)
+poi_air_distances = defaultdict(dict)  # address_index -> poi_id -> Luftlinie in Metern
 print("Erzeuge Routing-Tasks...")
 
 for addr_idx, row in df_addr.iterrows():
@@ -438,6 +439,7 @@ for addr_idx, row in df_addr.iterrows():
             lat_d = float(lats_dest[pos])
             lon_d = float(lons_dest[pos])
             poi_id = f"poi_{int(dest_ids[pos])}"
+            poi_air_distances[addr_idx][poi_id] = float(dists[pos])
             tasks.append((lon_a, lat_a, lon_d, lat_d, addr_idx, poi_id))
 
     # -----------------------------------------------------
