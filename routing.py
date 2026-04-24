@@ -4,6 +4,7 @@ import requests
 import json
 import os
 import threading
+import time
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -36,10 +37,13 @@ CSV_OUTPUT        = "out/adressen_mit_" + DOMAIN + "_routen.csv"
 # ---------------------------------------------------------
 DISTANCE_THRESHOLDS = [500]     # Zaehlradius
 HAVERSINE_LIMIT_M   = 2000                 # Kandidatensuche
-MAX_WORKERS         = 8                   # parallele Threads
+MAX_WORKERS         = 16                   # parallele Threads
 ROUTING_ENABLED     = True                 # debug/skip moeglich
 ORS_TIMEOUT_S       = 15                   # request timeout
 ORS_RETRY_RADII_M   = [None, 1200, 2500]   # Retry bei ORS 2010 (Snapping)
+POI_SELECTION_AIR_MARGIN_M = 120          # plausible Auswahl nahegelegener POIs
+POI_SELECTION_AIR_MAX_M    = 350          # absolute Obergrenze fuer Nahbereich
+ROUTING_PROGRESS_INTERVAL_S = 5           # Fortschrittsausgabe alle n Sekunden
 
 # ---------------------------------------------------------
 # DEBUG-COUNTER
@@ -298,21 +302,34 @@ def route_task(args):
     return addr_idx, area_id, dist, geom
 
 
-def print_routing_progress(done_count, total_count, addr_idx, area_id, dist):
-    """Aktualisiert eine kompakte Statuszeile fuer den Routing-Fortschritt."""
-    if total_count <= 0:
-        return
+def select_best_poi_entry(valid_entries, air_dist_map):
+    """Waehlt bei POIs zuerst unter plausibel nahen Kandidaten, dann nach Routingdistanz."""
+    if len(valid_entries) == 0:
+        return None
 
-    if dist is None:
-        dist_text = "n/a"
-    else:
-        dist_text = f"{dist:.1f} m"
+    entries_with_air = []
+    for poi_id, dist, geom in valid_entries:
+        air_dist = air_dist_map.get(poi_id)
+        if air_dist is None:
+            air_dist = np.inf
+        entries_with_air.append((poi_id, dist, geom, air_dist))
 
-    progress_text = (
-        f"[{done_count}/{total_count}] Routed: "
-        f"addr_idx={addr_idx} -> {area_id} ({dist_text})"
+    nearest_air = min(entry[3] for entry in entries_with_air)
+    plausible_air_limit = min(
+        nearest_air + POI_SELECTION_AIR_MARGIN_M,
+        POI_SELECTION_AIR_MAX_M
     )
-    print(progress_text, end="\r", flush=True)
+
+    preferred_entries = [
+        (poi_id, dist, geom)
+        for poi_id, dist, geom, air_dist in entries_with_air
+        if air_dist <= plausible_air_limit
+    ]
+
+    if len(preferred_entries) == 0:
+        preferred_entries = valid_entries
+
+    return min(preferred_entries, key=lambda x: x[1])
 
 
 # ---------------------------------------------------------
@@ -461,6 +478,53 @@ print("Anzahl Routing-Tasks:", len(tasks))
 print(f"Starte paralleles Routing ({MAX_WORKERS} Threads)...")
 results = defaultdict(dict)
 
+
+def print_routing_progress(completed_futures, total_futures, addr_idx, area_id, dist):
+    """Gibt den Routing-Fortschritt als fortlaufende Logzeilen aus."""
+    if total_futures <= 0:
+        return
+
+    now = time.monotonic()
+    state = getattr(print_routing_progress, "_state", None)
+    if state is None or completed_futures <= 1:
+        state = {
+            "started_at": now,
+            "last_print_at": 0.0,
+        }
+        print_routing_progress._state = state
+
+    is_first = completed_futures == 1
+    is_done = completed_futures >= total_futures
+    interval_elapsed = now - state["last_print_at"] >= ROUTING_PROGRESS_INTERVAL_S
+    if not (is_first or is_done or interval_elapsed):
+        return
+
+    elapsed_s = max(now - state["started_at"], 0.001)
+    progress_pct = completed_futures / total_futures * 100
+    routes_per_s = completed_futures / elapsed_s
+    remaining = max(total_futures - completed_futures, 0)
+    eta_s = remaining / routes_per_s if routes_per_s > 0 else None
+
+    if eta_s is None:
+        eta_text = "unbekannt"
+    elif eta_s < 60:
+        eta_text = f"{eta_s:.0f} s"
+    else:
+        eta_text = f"{eta_s / 60:.1f} min"
+
+    dist_text = "keine Distanz" if dist is None else f"{dist:.1f} m"
+    print(
+        "[Routing-Fortschritt] "
+        f"{completed_futures}/{total_futures} ({progress_pct:.1f} %) | "
+        f"Adresse {addr_idx} -> {area_id}: {dist_text} | "
+        f"{routes_per_s:.2f} Routen/s | ETA {eta_text} | "
+        f"ORS ok/Fehler: {ROUTE_SUCCESS_COUNT}/{ROUTE_ERROR_COUNT}",
+        flush=True,
+    )
+    state["last_print_at"] = now
+
+
+
 if ROUTING_ENABLED and len(tasks) > 0:
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as ex:
         future_list = [ex.submit(route_task, t) for t in tasks]
@@ -508,7 +572,6 @@ for d in DISTANCE_THRESHOLDS:
 
 for addr_idx in df_addr.index:
     dist_map = results.get(addr_idx, {})
-
     if len(dist_map) == 0:
         continue
 
@@ -529,12 +592,19 @@ for addr_idx in df_addr.index:
         if dist_geom[0] is not None
     ]
 
-    # Minimale Distanz finden
-    best_area, best_dist, best_geom = min(valid_entries, key=lambda x: x[1])
+    if len(valid_entries) > 0:
+        # Minimale Distanz finden; bei Haltestellen zuerst auf plausible Naehe eingrenzen
+        if ROUTING_MODE == "poi" and DOMAIN == "haltestellen":
+            best_area, best_dist, best_geom = select_best_poi_entry(
+                valid_entries,
+                poi_air_distances.get(addr_idx, {})
+            )
+        else:
+            best_area, best_dist, best_geom = min(valid_entries, key=lambda x: x[1])
 
-    # Eintragen
-    df_addr.loc[addr_idx, DOMAIN + "_min_distance"] = best_dist
-    df_addr.loc[addr_idx, DOMAIN + "_route"] = best_geom
+        # Eintragen
+        df_addr.loc[addr_idx, DOMAIN + "_min_distance"] = best_dist
+        df_addr.loc[addr_idx, DOMAIN + "_route"] = best_geom
 
     if ROUTING_MODE == "poi" and str(best_area).startswith("poi_"):
         dest_idx = int(str(best_area).split("_", 1)[1])
