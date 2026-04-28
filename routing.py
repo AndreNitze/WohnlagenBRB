@@ -37,6 +37,8 @@ CSV_OUTPUT        = "out/adressen_mit_" + DOMAIN + "_routen.csv"
 # ---------------------------------------------------------
 DISTANCE_THRESHOLDS = [500]     # Zaehlradius
 HAVERSINE_LIMIT_M   = 2000                 # Kandidatensuche
+HALTESTELLEN_FALLBACK_HAVERSINE_LIMIT_M = 5000  # nur wenn im Basisradius keine Haltestelle liegt
+HALTESTELLEN_FALLBACK_MAX_CANDIDATES = 30       # begrenzt ORS-Last fuer Aussenlagen
 MAX_WORKERS         = 8                   # parallele Threads
 ROUTING_ENABLED     = True                 # debug/skip moeglich
 ORS_TIMEOUT_S       = 15                   # request timeout
@@ -332,6 +334,21 @@ def select_best_poi_entry(valid_entries, air_dist_map):
     return min(preferred_entries, key=lambda x: x[1])
 
 
+def select_candidate_positions(dists, domain):
+    """Waehlt POI-Kandidatenpositionen fuer das Routing."""
+    cand_mask = dists <= HAVERSINE_LIMIT_M
+    if cand_mask.any():
+        return np.where(cand_mask)[0]
+
+    if domain == "haltestellen":
+        fallback_pos = np.where(dists <= HALTESTELLEN_FALLBACK_HAVERSINE_LIMIT_M)[0]
+        if len(fallback_pos) > 0:
+            ordered = fallback_pos[np.argsort(dists[fallback_pos])]
+            return ordered[:HALTESTELLEN_FALLBACK_MAX_CANDIDATES]
+
+    return np.array([int(np.argmin(dists))])
+
+
 # ---------------------------------------------------------
 # DATEN LADEN: ADRESSEN
 # ---------------------------------------------------------
@@ -429,12 +446,8 @@ for addr_idx, row in df_addr.iterrows():
 
         # Alle Ziele innerhalb Haversine-Limit als Routing-Kandidaten.
         # Falls keine im Radius liegen, mindestens das naechste Ziel verwenden.
-        cand_mask = dists <= HAVERSINE_LIMIT_M
-        if not cand_mask.any():
-            nearest_idx = int(np.argmin(dists))
-            cand_mask[nearest_idx] = True
-
-        cand_pos = np.where(cand_mask)[0]
+        # Haltestellen bekommen fuer Aussenlagen einen begrenzten erweiterten Fallback.
+        cand_pos = select_candidate_positions(dists, DOMAIN)
         for pos in cand_pos:
             lat_d = float(lats_dest[pos])
             lon_d = float(lons_dest[pos])
