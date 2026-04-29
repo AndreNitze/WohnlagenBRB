@@ -37,6 +37,27 @@ def get_category(row):
     return str(get_first_value(row, ["Kategorie", "kategorie"], "")).strip().lower()
 
 
+def normalize_input_dataframe(df):
+    """Gleicht Korrektur-CSV-Spalten an das bisherige Haltestellen-Schema an."""
+    rename_map = {
+        "name": "Name_Haltestelle",
+        "kategorie": "Kategorie",
+        "Unnamed: 9": "Stadtlinien",
+        "Anzahl der Stadtlinien (mit Nachtbus)": "Anzahl der Linien",
+    }
+    existing_renames = {
+        source: target
+        for source, target in rename_map.items()
+        if source in df.columns and target not in df.columns
+    }
+    df = df.rename(columns=existing_renames)
+
+    if "Anzahl der Linien" not in df.columns and "Anzahl der Stadtlinien (ohne Nachtbus)" in df.columns:
+        df["Anzahl der Linien"] = df["Anzahl der Stadtlinien (ohne Nachtbus)"]
+
+    return df
+
+
 def get_street_name(row):
     # Unterstuetzt saubere und fehlerhaft kodierte Varianten.
     return str(
@@ -57,7 +78,7 @@ def get_street_name(row):
 
 def build_address(row):
     # --- Sonderfall "Haltestellen" ---
-    name = str(get_first_value(row, ["Name_Haltestelle"], "")).strip()
+    name = str(get_first_value(row, ["Name_Haltestelle", "name"], "")).strip()
     if name:
         name = name.replace(",", "").strip()
         kategorie = get_category(row)
@@ -125,7 +146,7 @@ def make_merge_addr(row):
     if street:
         return f"{street.lower()} {hn}".replace("  ", " ").strip()
 
-    name = str(get_first_value(row, ["Name_Haltestelle"], "")).strip().lower()
+    name = str(get_first_value(row, ["Name_Haltestelle", "name"], "")).strip().lower()
     if name:
         if "haltestelle" not in name:
             name = f"haltestelle {name}"
@@ -182,7 +203,7 @@ def geocode_address(address_list):
 
 
 def main():
-    df = load_input_csv(CSV_EINGABE)
+    df = normalize_input_dataframe(load_input_csv(CSV_EINGABE))
     df["Adresse_query"] = df.apply(build_address, axis=1)
     df["Adresse_merge"] = df.apply(make_merge_addr, axis=1)
 

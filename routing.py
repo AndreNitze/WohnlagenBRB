@@ -26,7 +26,7 @@ ORS_API_KEY = "your_api_key_here"
 # ---------------------------------------------------------
 # DATEIEN
 # ---------------------------------------------------------
-DOMAIN            = "einzelhandel"
+DOMAIN            = "haltestellen"
 CSV_ADDRESSES     = "out/adressen_geocoded.csv"
 CSV_DESTINATIONS  = "out/" + DOMAIN + "_geocoded.csv" # Wenn POI-Modus
 AREA_PATH         = "data/Grünflächen_Verkehrszeichen/20251029_Vegetation_KSP_GP_31.shp" # Wenn AREA-Modus
