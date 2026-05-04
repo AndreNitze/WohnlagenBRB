@@ -36,15 +36,12 @@ CSV_OUTPUT        = "out/adressen_mit_" + DOMAIN + "_routen.csv"
 # PARAMETER
 # ---------------------------------------------------------
 DISTANCE_THRESHOLDS = [500]     # Zaehlradius
-HAVERSINE_LIMIT_M   = 2000                 # Kandidatensuche
-HALTESTELLEN_FALLBACK_HAVERSINE_LIMIT_M = 5000  # nur wenn im Basisradius keine Haltestelle liegt
-HALTESTELLEN_FALLBACK_MAX_CANDIDATES = 30       # begrenzt ORS-Last fuer Aussenlagen
+HAVERSINE_LIMIT_M   = 3500                 # Kandidatensuche
+POI_MAX_CANDIDATES  = 30                   # begrenzt ORS-Last fuer alle POI-Domaenen
 MAX_WORKERS         = 8                   # parallele Threads
 ROUTING_ENABLED     = True                 # debug/skip moeglich
 ORS_TIMEOUT_S       = 15                   # request timeout
 ORS_RETRY_RADII_M   = [None, 1200, 2500]   # Retry bei ORS 2010 (Snapping)
-POI_SELECTION_AIR_MARGIN_M = 120          # plausible Auswahl nahegelegener POIs
-POI_SELECTION_AIR_MAX_M    = 350          # absolute Obergrenze fuer Nahbereich
 ROUTING_PROGRESS_INTERVAL_S = 5           # Fortschrittsausgabe alle n Sekunden
 
 # ---------------------------------------------------------
@@ -126,7 +123,10 @@ def route_distance(lon_a, lat_a, lon_b, lat_b):
                 "coordinates": [[lon_a, lat_a], [lon_b, lat_b]],
                 "instructions": False,
                 "geometry": True,
-                "preference": "recommended"
+                "preference": "recommended",
+                "options": {
+                    "avoid_features": ["ferries"]
+                }
             }
             if radius is not None:
                 payload["radiuses"] = [radius, radius]
@@ -298,55 +298,48 @@ def route_task(args):
     """ThreadPool-Routing."""
     lon_a, lat_a, lon_d, lat_d, addr_idx, area_id = args
     dist, geom = route_distance(lon_a, lat_a, lon_d, lat_d)
-    if dist is None:
-        dist = haversine_single(lat_a, lon_a, lat_d, lon_d)
-        geom = None
     return addr_idx, area_id, dist, geom
 
 
-def select_best_poi_entry(valid_entries, air_dist_map):
-    """Waehlt bei POIs zuerst unter plausibel nahen Kandidaten, dann nach Routingdistanz."""
-    if len(valid_entries) == 0:
-        return None
-
-    entries_with_air = []
-    for poi_id, dist, geom in valid_entries:
-        air_dist = air_dist_map.get(poi_id)
-        if air_dist is None:
-            air_dist = np.inf
-        entries_with_air.append((poi_id, dist, geom, air_dist))
-
-    nearest_air = min(entry[3] for entry in entries_with_air)
-    plausible_air_limit = min(
-        nearest_air + POI_SELECTION_AIR_MARGIN_M,
-        POI_SELECTION_AIR_MAX_M
-    )
-
-    preferred_entries = [
-        (poi_id, dist, geom)
-        for poi_id, dist, geom, air_dist in entries_with_air
-        if air_dist <= plausible_air_limit
-    ]
-
-    if len(preferred_entries) == 0:
-        preferred_entries = valid_entries
-
-    return min(preferred_entries, key=lambda x: x[1])
-
-
-def select_candidate_positions(dists, domain):
+def select_candidate_positions(dists):
     """Waehlt POI-Kandidatenpositionen fuer das Routing."""
-    cand_mask = dists <= HAVERSINE_LIMIT_M
-    if cand_mask.any():
-        return np.where(cand_mask)[0]
+    if len(dists) == 0:
+        return np.array([], dtype=int)
 
-    if domain == "haltestellen":
-        fallback_pos = np.where(dists <= HALTESTELLEN_FALLBACK_HAVERSINE_LIMIT_M)[0]
-        if len(fallback_pos) > 0:
-            ordered = fallback_pos[np.argsort(dists[fallback_pos])]
-            return ordered[:HALTESTELLEN_FALLBACK_MAX_CANDIDATES]
+    cand_pos = np.where(dists <= HAVERSINE_LIMIT_M)[0]
+    if len(cand_pos) == 0:
+        cand_pos = np.arange(len(dists))
 
-    return np.array([int(np.argmin(dists))])
+    ordered = cand_pos[np.argsort(dists[cand_pos])]
+    return ordered[:POI_MAX_CANDIDATES]
+
+
+def format_target_name(dest_row, fallback_col=None):
+    """Erzeugt lesbare POI-Namen, bei Maerkten inklusive Betreiber."""
+    parts = []
+    for col in ["Name_Unternehmen", "Name_Haltestelle", "name", "Name"]:
+        if col in dest_row.index and pd.notna(dest_row[col]) and str(dest_row[col]).strip():
+            parts.append(str(dest_row[col]).strip())
+            break
+
+    address_parts = []
+    if "Straßenname" in dest_row.index and pd.notna(dest_row["Straßenname"]):
+        address_parts.append(str(dest_row["Straßenname"]).strip())
+    if "Hsnr" in dest_row.index and pd.notna(dest_row["Hsnr"]):
+        address_parts.append(str(dest_row["Hsnr"]).strip())
+    if "HsnrZus" in dest_row.index and pd.notna(dest_row["HsnrZus"]):
+        address_parts.append(str(dest_row["HsnrZus"]).strip())
+    if address_parts:
+        address = " ".join(address_parts)
+        if not parts or address.casefold() not in parts[0].casefold():
+            parts.append(address)
+
+    if not parts and fallback_col is not None and fallback_col in dest_row.index:
+        value = dest_row[fallback_col]
+        if pd.notna(value) and str(value).strip():
+            parts.append(str(value).strip())
+
+    return ", ".join(parts) if parts else None
 
 
 # ---------------------------------------------------------
@@ -444,10 +437,9 @@ for addr_idx, row in df_addr.iterrows():
     if ROUTING_MODE == "poi":
         dists = haversine_np(lat_a, lon_a, lats_dest, lons_dest)
 
-        # Alle Ziele innerhalb Haversine-Limit als Routing-Kandidaten.
-        # Falls keine im Radius liegen, mindestens das naechste Ziel verwenden.
-        # Haltestellen bekommen fuer Aussenlagen einen begrenzten erweiterten Fallback.
-        cand_pos = select_candidate_positions(dists, DOMAIN)
+        # Ziele innerhalb Haversine-Limit als Routing-Kandidaten.
+        # Falls keine im Radius liegen, werden die naechsten POIs geroutet.
+        cand_pos = select_candidate_positions(dists)
         for pos in cand_pos:
             lat_d = float(lats_dest[pos])
             lon_d = float(lons_dest[pos])
@@ -608,14 +600,8 @@ for addr_idx in df_addr.index:
     ]
 
     if len(valid_entries) > 0:
-        # Minimale Distanz finden; bei Haltestellen zuerst auf plausible Naehe eingrenzen
-        if ROUTING_MODE == "poi" and DOMAIN == "haltestellen":
-            best_area, best_dist, best_geom = select_best_poi_entry(
-                valid_entries,
-                poi_air_distances.get(addr_idx, {})
-            )
-        else:
-            best_area, best_dist, best_geom = min(valid_entries, key=lambda x: x[1])
+        # Minimale echte Routingdistanz finden.
+        best_area, best_dist, best_geom = min(valid_entries, key=lambda x: x[1])
 
         # Eintragen
         df_addr.loc[addr_idx, DOMAIN + "_min_distance"] = best_dist
@@ -626,8 +612,9 @@ for addr_idx in df_addr.index:
         df_addr.loc[addr_idx, DOMAIN + "_target_id"] = dest_idx
         df_addr.loc[addr_idx, DOMAIN + "_target_lat"] = df_dest.loc[dest_idx, "lat"]
         df_addr.loc[addr_idx, DOMAIN + "_target_lon"] = df_dest.loc[dest_idx, "lon"]
-        if dest_name_col is not None:
-            df_addr.loc[addr_idx, DOMAIN + "_target_name"] = df_dest.loc[dest_idx, dest_name_col]
+        target_name = format_target_name(df_dest.loc[dest_idx], dest_name_col)
+        if target_name is not None:
+            df_addr.loc[addr_idx, DOMAIN + "_target_name"] = target_name
     else:
         df_addr.loc[addr_idx, DOMAIN + "_target_id"] = best_area
 
