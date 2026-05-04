@@ -7,8 +7,9 @@ import requests
 # ------------------------------------------------------------------
 # KONSTANTEN
 ORS_URL = "http://localhost:8080/ors/v2/directions/foot-walking/geojson"
-PRE_FILTER_KM = 3.5       # Haversine-Radius, ab dem wir ueberhaupt routen
-CANDIDATE_LIMIT = 30      # begrenzt ORS-Last
+CANDIDATE_LIMIT = 50      # bis hierhin werden alle Einzelhandelsziele geroutet
+ADAPTIVE_BATCH_SIZE = 10
+COUNT_THRESHOLDS_M = [500, 800]
 
 
 # ------------------------------------------------------------------
@@ -79,31 +80,43 @@ for i, a in df_addr.iterrows():
     count_500 = 0
     count_800 = 0
 
-    # Vorfilter ueber Luftlinie
-    cand = []
+    # Luftlinie sortiert nur die Routing-Reihenfolge. Kleine POI-Domaenen
+    # werden komplett geroutet; groessere brechen adaptiv ab, sobald kein
+    # ungeprueftes Ziel mehr besser sein oder in einen Zaehlradius fallen kann.
+    candidates = []
     for _, s in df_shops.iterrows():
         d_lin = haversine(lat_a, lon_a, float(s.lat), float(s.lon))
-        if d_lin <= PRE_FILTER_KM * 1000:
-            cand.append((d_lin, s))
+        candidates.append((d_lin, s))
 
-    # Sortieren, nahe zuerst
-    for d_lin, s in sorted(cand, key=lambda x: x[0])[:CANDIDATE_LIMIT]:
-        dist_m = route_distance(
-            lon_a, lat_a,
-            float(s.lon), float(s.lat),
-        )
-        if dist_m is None:
-            continue
+    candidates = sorted(candidates, key=lambda x: x[0])
+    for start in range(0, len(candidates), ADAPTIVE_BATCH_SIZE):
+        batch = candidates[start:start + ADAPTIVE_BATCH_SIZE]
 
-        # Zaehlen innerhalb Radien
-        if dist_m <= 500:
-            count_500 += 1
-        if dist_m <= 800:
-            count_800 += 1
+        for d_lin, s in batch:
+            dist_m = route_distance(
+                lon_a, lat_a,
+                float(s.lon), float(s.lat),
+            )
+            if dist_m is None:
+                continue
 
-        # Nearest
-        if best is None or dist_m < best:
-            best = dist_m
+            # Zaehlen innerhalb Radien
+            if dist_m <= 500:
+                count_500 += 1
+            if dist_m <= 800:
+                count_800 += 1
+
+            # Nearest
+            if best is None or dist_m < best:
+                best = dist_m
+
+        next_idx = start + ADAPTIVE_BATCH_SIZE
+        if len(candidates) > CANDIDATE_LIMIT and best is not None:
+            if next_idx >= len(candidates):
+                break
+            next_air_dist = candidates[next_idx][0]
+            if next_air_dist >= max(best, max(COUNT_THRESHOLDS_M)):
+                break
 
     nearest_dist.append(best)
     shops_500m.append(count_500)

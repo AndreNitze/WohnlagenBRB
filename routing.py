@@ -26,7 +26,7 @@ ORS_API_KEY = "your_api_key_here"
 # ---------------------------------------------------------
 # DATEIEN
 # ---------------------------------------------------------
-DOMAIN            = "haltestellen"
+DOMAIN            = "einzelhandel"
 CSV_ADDRESSES     = "out/adressen_geocoded.csv"
 CSV_DESTINATIONS  = "out/" + DOMAIN + "_geocoded.csv" # Wenn POI-Modus
 AREA_PATH         = "data/Grünflächen_Verkehrszeichen/20251029_Vegetation_KSP_GP_31.shp" # Wenn AREA-Modus
@@ -36,8 +36,8 @@ CSV_OUTPUT        = "out/adressen_mit_" + DOMAIN + "_routen.csv"
 # PARAMETER
 # ---------------------------------------------------------
 DISTANCE_THRESHOLDS = [500]     # Zaehlradius
-HAVERSINE_LIMIT_M   = 3500                 # Kandidatensuche
-POI_MAX_CANDIDATES  = 30                   # begrenzt ORS-Last fuer alle POI-Domaenen
+POI_MAX_CANDIDATES  = 50                   # bis hierhin werden POI-Domaenen komplett geroutet
+POI_ADAPTIVE_BATCH_SIZE = 10                  # Routenblock fuer adaptive POI-Suche
 MAX_WORKERS         = 8                   # parallele Threads
 ROUTING_ENABLED     = True                 # debug/skip moeglich
 ORS_TIMEOUT_S       = 15                   # request timeout
@@ -301,17 +301,48 @@ def route_task(args):
     return addr_idx, area_id, dist, geom
 
 
-def select_candidate_positions(dists):
-    """Waehlt POI-Kandidatenpositionen fuer das Routing."""
-    if len(dists) == 0:
-        return np.array([], dtype=int)
+def route_poi_address_task(args):
+    """
+    Routet POI-Ziele fuer eine Adresse.
 
-    cand_pos = np.where(dists <= HAVERSINE_LIMIT_M)[0]
-    if len(cand_pos) == 0:
-        cand_pos = np.arange(len(dists))
+    Bei kleinen POI-Domaenen werden alle Ziele geroutet. Bei groesseren
+    Domaenen wird nach Luftlinie sortiert und in Bloecken geroutet. Sobald
+    die naechste ungepruefte Luftlinie groesser/gleich der besten gefundenen
+    Routingdistanz ist, kann kein ungeprueftes Ziel mehr gewinnen.
+    """
+    addr_idx, lon_a, lat_a = args
+    dists = haversine_np(lat_a, lon_a, lats_dest, lons_dest)
+    candidate_pos = np.argsort(dists)
 
-    ordered = cand_pos[np.argsort(dists[cand_pos])]
-    return ordered[:POI_MAX_CANDIDATES]
+    dist_map = {}
+    best_dist = None
+    last_area_id = None
+    last_dist = None
+
+    for start in range(0, len(candidate_pos), POI_ADAPTIVE_BATCH_SIZE):
+        batch = candidate_pos[start:start + POI_ADAPTIVE_BATCH_SIZE]
+
+        for pos in batch:
+            lat_d = float(lats_dest[pos])
+            lon_d = float(lons_dest[pos])
+            poi_id = f"poi_{int(dest_ids[pos])}"
+            dist, geom = route_distance(lon_a, lat_a, lon_d, lat_d)
+            dist_map[poi_id] = (dist, geom)
+            last_area_id = poi_id
+            last_dist = dist
+            if dist is not None and (best_dist is None or dist < best_dist):
+                best_dist = dist
+
+        next_pos_idx = start + POI_ADAPTIVE_BATCH_SIZE
+        if len(candidate_pos) > POI_MAX_CANDIDATES and best_dist is not None:
+            if next_pos_idx >= len(candidate_pos):
+                break
+            next_air_dist = float(dists[candidate_pos[next_pos_idx]])
+            count_threshold = max(DISTANCE_THRESHOLDS) if DISTANCE_THRESHOLDS else 0
+            if next_air_dist >= max(best_dist, count_threshold):
+                break
+
+    return addr_idx, dist_map, last_area_id, last_dist
 
 
 def format_target_name(dest_row, fallback_col=None):
@@ -421,8 +452,7 @@ else:
 # ---------------------------------------------------------
 # ROUTING-TASKS ERZEUGEN
 # ---------------------------------------------------------
-tasks = []   # (lon_a, lat_a, lon_d, lat_d, address_index, target_id)
-poi_air_distances = defaultdict(dict)  # address_index -> poi_id -> Luftlinie in Metern
+tasks = []
 print("Erzeuge Routing-Tasks...")
 
 for addr_idx, row in df_addr.iterrows():
@@ -435,17 +465,7 @@ for addr_idx, row in df_addr.iterrows():
     # POI-MODUS
     # -----------------------------------------------------
     if ROUTING_MODE == "poi":
-        dists = haversine_np(lat_a, lon_a, lats_dest, lons_dest)
-
-        # Ziele innerhalb Haversine-Limit als Routing-Kandidaten.
-        # Falls keine im Radius liegen, werden die naechsten POIs geroutet.
-        cand_pos = select_candidate_positions(dists)
-        for pos in cand_pos:
-            lat_d = float(lats_dest[pos])
-            lon_d = float(lons_dest[pos])
-            poi_id = f"poi_{int(dest_ids[pos])}"
-            poi_air_distances[addr_idx][poi_id] = float(dists[pos])
-            tasks.append((lon_a, lat_a, lon_d, lat_d, addr_idx, poi_id))
+        tasks.append((addr_idx, lon_a, lat_a))
 
     # -----------------------------------------------------
     # AREA-MODUS - mehrere GRUENFLAECHEN pro Adresse
@@ -508,9 +528,9 @@ def print_routing_progress(completed_futures, total_futures, addr_idx, area_id, 
 
     elapsed_s = max(now - state["started_at"], 0.001)
     progress_pct = completed_futures / total_futures * 100
-    routes_per_s = completed_futures / elapsed_s
+    tasks_per_s = completed_futures / elapsed_s
     remaining = max(total_futures - completed_futures, 0)
-    eta_s = remaining / routes_per_s if routes_per_s > 0 else None
+    eta_s = remaining / tasks_per_s if tasks_per_s > 0 else None
 
     if eta_s is None:
         eta_text = "unbekannt"
@@ -524,7 +544,7 @@ def print_routing_progress(completed_futures, total_futures, addr_idx, area_id, 
         "[Routing-Fortschritt] "
         f"{completed_futures}/{total_futures} ({progress_pct:.1f} %) | "
         f"Adresse {addr_idx} -> {area_id}: {dist_text} | "
-        f"{routes_per_s:.2f} Routen/s | ETA {eta_text} | "
+        f"{tasks_per_s:.2f} Tasks/s | ETA {eta_text} | "
         f"ORS ok/Fehler: {ROUTE_SUCCESS_COUNT}/{ROUTE_ERROR_COUNT}",
         flush=True,
     )
@@ -534,14 +554,19 @@ def print_routing_progress(completed_futures, total_futures, addr_idx, area_id, 
 
 if ROUTING_ENABLED and len(tasks) > 0:
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as ex:
-        future_list = [ex.submit(route_task, t) for t in tasks]
+        task_func = route_poi_address_task if ROUTING_MODE == "poi" else route_task
+        future_list = [ex.submit(task_func, t) for t in tasks]
         total_futures = len(future_list)
         completed_futures = 0
 
         for fut in as_completed(future_list):
-            addr_idx, area_id, dist, geom = fut.result()
-            # dist kann None sein, wir speichern trotzdem
-            results[addr_idx][area_id] = (dist, geom)
+            if ROUTING_MODE == "poi":
+                addr_idx, dist_map, area_id, dist = fut.result()
+                results[addr_idx].update(dist_map)
+            else:
+                addr_idx, area_id, dist, geom = fut.result()
+                # dist kann None sein, wir speichern trotzdem
+                results[addr_idx][area_id] = (dist, geom)
             completed_futures += 1
             print_routing_progress(
                 completed_futures,
