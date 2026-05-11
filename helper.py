@@ -74,6 +74,29 @@ def load_geocsv(path, crs="EPSG:4326", geometry_col="geometry"):
     return gdf
 
 TOOLTIP_FORMAT = "<b>{Name}</b><br>{Straßenname} {Hsnr}{HsnrZus}"
+def _format_address(strasse, hsnr, hsnrzus):
+    return f"{strasse} {hsnr}{hsnrzus}".strip()
+
+
+def _build_marker_tooltip(name_values, strasse, hsnr, hsnrzus, tooltip_format, fallback_label):
+    name_values = [name for name in dict.fromkeys(name_values) if name]
+    address = _format_address(strasse, hsnr, hsnrzus)
+
+    if len(name_values) > 1:
+        names_html = "<br>".join(name_values)
+        return f"<b>{names_html}</b><br>{address}" if address else f"<b>{names_html}</b>"
+
+    name_value = name_values[0] if name_values else ""
+    if address or name_value:
+        return tooltip_format.format(
+            Name=name_value,
+            Straßenname=strasse,
+            Hsnr=hsnr,
+            HsnrZus=hsnrzus
+        )
+    return fallback_label
+
+
 def add_markers_from_csv(
     map_obj,
     csv_path,
@@ -97,12 +120,12 @@ def add_markers_from_csv(
 
     layer = folium.FeatureGroup(name=layer_name) if layer_name else map_obj
 
+    marker_rows = []
     for _, row in df.iterrows():
         # explizit fehlende Werte ersetzen
         strasse = s(row.get(STRASSENNAME))
         hsnr    = s(row.get(HAUSNUMMER))
         hsnrzus = s(row.get(HAUSNUMMERZUSATZ))
-        hat_adresse = any([strasse, hsnr, hsnrzus])
 
         # Name aus der ersten nicht-leeren 'Name_'-Spalte ableiten
         name_value = ""
@@ -112,19 +135,34 @@ def add_markers_from_csv(
                 name_value = val
                 break
 
-        # Tooltip bauen (falls keine Adresse, Fallback)
-        if hat_adresse or name_value:
-            tooltip = tooltip_format.format(
-                Name=name_value,
-                Straßenname=strasse,
-                Hsnr=hsnr,
-                HsnrZus=hsnrzus
-            )
-        else:
-            tooltip = fallback_label
+        marker_rows.append({
+            "lat": row["lat"],
+            "lon": row["lon"],
+            "strasse": strasse,
+            "hsnr": hsnr,
+            "hsnrzus": hsnrzus,
+            "name": name_value,
+        })
+
+    marker_df = pd.DataFrame(marker_rows)
+    if marker_df.empty:
+        if layer_name:
+            layer.add_to(map_obj)
+        return
+
+    for _, group in marker_df.groupby(["lat", "lon", "strasse", "hsnr", "hsnrzus"], dropna=False, sort=False):
+        first = group.iloc[0]
+        tooltip = _build_marker_tooltip(
+            group["name"].tolist(),
+            first["strasse"],
+            first["hsnr"],
+            first["hsnrzus"],
+            tooltip_format,
+            fallback_label,
+        )
 
         marker = folium.Marker(
-            location=[row["lat"], row["lon"]],
+            location=[first["lat"], first["lon"]],
             icon=folium.Icon(color=color, icon=icon, prefix="fa"),
             tooltip=tooltip
         )

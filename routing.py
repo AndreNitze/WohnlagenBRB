@@ -1,4 +1,5 @@
-﻿import pandas as pd
+﻿import argparse
+import pandas as pd
 import numpy as np
 import requests
 import json
@@ -26,7 +27,29 @@ ORS_API_KEY = "your_api_key_here"
 # ---------------------------------------------------------
 # DATEIEN
 # ---------------------------------------------------------
-DOMAIN            = "einzelhandel"
+DOMAIN_CONFIGS = {
+    "haltestellen": {
+        "distance_thresholds": [500, 800],
+    },
+    "einzelhandel": {
+        "distance_thresholds": [500, 800],
+    },
+}
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Berechnet Fussrouten zu POI-Zielen mit lokalem ORS.")
+    parser.add_argument(
+        "--domain",
+        choices=sorted(DOMAIN_CONFIGS),
+        default="haltestellen",
+        help="Zieldomain fuer Routing und Ausgabedatei.",
+    )
+    return parser.parse_args()
+
+
+ARGS = parse_args()
+DOMAIN            = ARGS.domain
 CSV_ADDRESSES     = "out/adressen_geocoded.csv"
 CSV_DESTINATIONS  = "out/" + DOMAIN + "_geocoded.csv" # Wenn POI-Modus
 AREA_PATH         = "data/Grünflächen_Verkehrszeichen/20251029_Vegetation_KSP_GP_31.shp" # Wenn AREA-Modus
@@ -35,7 +58,7 @@ CSV_OUTPUT        = "out/adressen_mit_" + DOMAIN + "_routen.csv"
 # ---------------------------------------------------------
 # PARAMETER
 # ---------------------------------------------------------
-DISTANCE_THRESHOLDS = [500]     # Zaehlradius
+DISTANCE_THRESHOLDS = DOMAIN_CONFIGS[DOMAIN]["distance_thresholds"]     # Zaehlradius
 POI_MAX_CANDIDATES  = 50                   # bis hierhin werden POI-Domaenen komplett geroutet
 POI_ADAPTIVE_BATCH_SIZE = 10                  # Routenblock fuer adaptive POI-Suche
 MAX_WORKERS         = 8                   # parallele Threads
