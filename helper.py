@@ -193,6 +193,70 @@ def clean_index_cols(df):
         df.drop(columns=cols, inplace=True, errors="ignore")
     return df
 
+
+def smooth_clusters_by_block(
+    gdf_input,
+    source_cluster_col,
+    target_cluster_col,
+    changed_flag_col=None,
+    block_col="block",
+    min_share=0.5,
+):
+    """Glättet Adress-Cluster über die Mehrheitszuordnung im Block.
+
+    Für jeden Block wird das häufigste Cluster aus ``source_cluster_col``
+    bestimmt. Nur wenn dessen Anteil strikt größer als ``min_share`` ist,
+    wird dieses Cluster auf alle Adressen des Blocks übertragen. Blöcke ohne
+    klare Mehrheit behalten ihre ursprüngliche Clusterzuordnung.
+
+    Returns
+    -------
+    tuple
+        ``(gdf_result, majority)`` mit dem geglätteten GeoDataFrame und einer
+        Tabelle der verwendeten Blockmehrheiten. ``majority`` enthält
+        ``block_col``, ``target_cluster_col``, ``address_count``,
+        ``cluster_count`` und ``share``.
+    """
+    gdf_result = gdf_input.copy()
+    valid = gdf_result[[block_col, source_cluster_col]].dropna().copy()
+    if valid.empty:
+        if changed_flag_col:
+            gdf_result[changed_flag_col] = False
+        return gdf_result, pd.DataFrame(
+            columns=[block_col, target_cluster_col, "address_count", "cluster_count", "share"]
+        )
+
+    counts = (
+        valid.groupby([block_col, source_cluster_col], as_index=False)
+        .size()
+        .rename(columns={"size": "cluster_count"})
+    )
+    totals = valid.groupby(block_col, as_index=False).size().rename(columns={"size": "address_count"})
+    majority = counts.merge(totals, on=block_col, how="left")
+    majority["share"] = majority["cluster_count"] / majority["address_count"]
+    majority = majority.sort_values(
+        [block_col, "share", "cluster_count", source_cluster_col],
+        ascending=[True, False, False, True],
+    )
+    majority = majority.drop_duplicates(block_col, keep="first")
+    majority = majority[majority["share"] > min_share].copy()
+    majority = majority.rename(columns={source_cluster_col: target_cluster_col})
+
+    block_lookup = dict(zip(majority[block_col], majority[target_cluster_col]))
+    mask = gdf_result[block_col].isin(block_lookup)
+    gdf_result[target_cluster_col] = gdf_result[source_cluster_col]
+    gdf_result.loc[mask, target_cluster_col] = gdf_result.loc[mask, block_col].map(block_lookup)
+
+    if changed_flag_col:
+        changed_mask = (
+            gdf_result[source_cluster_col].notna()
+            & gdf_result[target_cluster_col].notna()
+            & (gdf_result[source_cluster_col].astype("Int64") != gdf_result[target_cluster_col].astype("Int64"))
+        )
+        gdf_result[changed_flag_col] = changed_mask.fillna(False)
+
+    return gdf_result, majority[[block_col, target_cluster_col, "address_count", "cluster_count", "share"]]
+
 def add_medcenter_markers(map_obj, csv_path, fach_dict, color="red", icon="staff-snake", layer_name="Medizinische Zentren"):
     df = pd.read_csv(csv_path)
 
