@@ -144,12 +144,12 @@ Das aktuelle 2026-Modell bezieht die folgenden Kriterien ein (Distanzen immer in
 - Lärm-Index (laut [Lärmkartierung 2022](https://mleuv.brandenburg.de/mleuv/de/umwelt/immissionsschutz/laerm/umgebungslaerm/laermkartierung/#))
 - Lage vor bzw. hinter Bahnübergängen vom Stadtzentrum aus
 
-![Visualisierung des gemessenen Lärm-Index mit Adressen](laerm-index.png)
+![Visualisierung des gemessenen Lärm-Index mit Adressen](img/laerm-index.png)
 Abbildung 1: Visualisierung des gemessenen Lärm-Index mit Adressen
 
 Das Modell kann beliebig um neue Kriterien erweitert werden. Denkbar sind zum Beispiel auch neue Kriterien wie "zwischen der Adresse und dem Zentrum gibt es einen Bahnübergang" oder Ähnliches. Dadurch kann die Trennschärfe des Modells verbessert werden, was anhand der Gütemaße (s.u.) sichtbar werden sollte.
 
-![Visualisierung der Querung von Bahnübergängen (Beispiel)](bahn.png)
+![Visualisierung der Querung von Bahnübergängen (Beispiel)](img/bahn.png)
 Abbildung 2: Visualisierung der Querung von Bahnübergängen (Beispiel)
 
 Die **Kriterien fließen gewichtet in das Modell** ein. Diese Gewichtung ist nur vorläufig definiert und sollte für den langfristigen Einsatz möglichst festgeschrieben werden.
@@ -160,7 +160,10 @@ Der aktuelle Hauptansatz zur Bildung der Wohnlagen ist **SKATER auf Blockebene**
 
 Der Vorteil gegenüber einer rein adressbezogenen Clusterung ist, dass Wohnlagen nicht als verstreute Einzelpunkte entstehen, sondern als räumlich nachvollziehbare Flächen. Das passt besser zur fachlichen Erwartung an Wohnlagen und erleichtert die spätere Plausibilisierung auf Karten.
 
-In einer visuellen Plausibilitätsprüfung (vgl. Abbildung 2) ergeben sich gut nachvollziehbare Cluster, wie zum Beispiel "orange" als zentrumsnahe Lage mit sehr guter Nahversorgung in allen definierten Kriterien. Das blaue Cluster zeigt Adressen in Randlagen. 
+In einer visuellen Plausibilitätsprüfung (vgl. Abbildung 3) ergeben sich gut nachvollziehbare Cluster, wie zum Beispiel "orange" als zentrumsnahe Lage mit sehr guter Nahversorgung in allen definierten Kriterien. Das blaue Cluster zeigt Adressen in Randlagen. 
+
+![SKATER-Block-Cluster der Wohnlagen in Brandenburg an der Havel](img/skater-block.png)
+Abbildung 3: SKATER-Block-Cluster der Wohnlagen in Brandenburg an der Havel.
 
 Es wird aber immer auch **Abweichungen von der subjektiven Bewertung** geben. Diese "gefühlten" Abweichungen können mehrere Gründe haben:
 - Es gibt Kriterien, die die Wohnlage erheblich beeinflussen, aber noch nicht im Modell enthalten sind. In dem Fall können die Daten einfach ergänzt und in das Gewichtungsmodell eingefügt werden.
@@ -168,21 +171,21 @@ Es wird aber immer auch **Abweichungen von der subjektiven Bewertung** geben. Di
 
 Das gewählte Clustering-Verfahren erzeugt insgesamt eine datenbasierte, objektiv überprüfbare und erweiterbare Grundlage für die Einteilung von Wohnlagen. Je mehr relevante Daten eingefügt werden, desto präziser wird das Modell.
 
-![Beispiel-Clustering von Brandenburg an der Havel mit einigen Kriterien](cluster-example.png)
-Abbildung 3: Frühere Vergleichsdarstellung einer adressbezogenen K-Means-Clusterung mit Kitas, Schulen, Haltestellen, Supermärkten und Zentrumsnähe als Kriterien.
+![Beispiel-Clustering von Brandenburg an der Havel mit einigen Kriterien](img/cluster-example.png)
+Abbildung 4: Frühere Vergleichsdarstellung einer adressbezogenen K-Means-Clusterung mit Kitas, Schulen, Haltestellen, Supermärkten und Zentrumsnähe als Kriterien.
 
 Die Wahl der Clusteranzahl erfolgt nicht willkürlich, sondern orientiert sich an **statistischen Gütekriterien** und fachlicher Plausibilität. Im Notebook werden dazu unter anderem Kennzahlen und Kartendarstellungen erzeugt. So wird geprüft, ob die Cluster trennscharf genug sind und die räumlichen Ergebnisse sinnvoll zusammenhängende Wohnlagen bilden.
 
-![Silhouette-Score (Beispiel) für verschiedene Cluster-Anzahl](silhouette-example.png)
-Abbildung 4: Silhouette-Score (Beispiel) für verschiedene Cluster-Anzahl
+![Silhouette-Score (Beispiel) für verschiedene Cluster-Anzahl](img/silhouette-example.png)
+Abbildung 5: Silhouette-Score (Beispiel) für verschiedene Cluster-Anzahl
 
 ### Verhältnis zu K-Means
 K-Means wird nicht mehr als vorherrschender Ansatz genutzt, sondern nur noch als Vergleichs- und Analysevariante. Die entsprechende Herleitung und PCA-/K-Means-Auswertung liegt im Notebook `wohnlagen_kmeans_pca.ipynb`.
 
 Für die eigentliche Wohnlagenbildung ist `wohnlagen_2026.ipynb` maßgeblich. Dort steht die blockbasierte SKATER-Auswertung im Vordergrund.
 
-![Beispielhafte Wohnlagen mit SKATER-Bereinigung mit 7 Clustern](skater.png)
-Abbildung 5: Beispielhafte Wohnlagen mit SKATER auf Blockebene mit 7 Clustern
+![Beispielhafte Wohnlagen mit SKATER-Bereinigung mit 7 Clustern](img/skater.png)
+Abbildung 6: Beispielhafte Wohnlagen mit SKATER auf Blockebene mit 7 Clustern
 
 ### Validierung
 Um die Qualität der Ergebnisse zu prüfen, werden verschiedene Validierungsschritte genutzt:
@@ -193,8 +196,8 @@ Um die Qualität der Ergebnisse zu prüfen, werden verschiedene Validierungsschr
 
 - Geografische Kohärenz: Da Wohnlagen räumlich zusammenhängend sein sollten, wird zusätzlich kontrolliert, ob die resultierenden Cluster zusammenhängende Flächen bilden oder ob Adressen „versprengt“ erscheinen.
 
-![Beispielhafte Korrelation zwischen Kriterien](correlation-example.png)
-Abbildung 6: Beispielhafte Korrelationen zwischen Kriterien
+![Beispielhafte Korrelation zwischen Kriterien](img/correlation-example.png)
+Abbildung 7: Beispielhafte Korrelationen zwischen Kriterien
 
 ### Einschränkung der Validität
 Die Bewertung der Merkmale erfolgt über Z-Scores, also standardisierte Abweichungen vom Mittelwert. Dadurch ist die Einordnung relativ zur jeweils betrachteten Gesamtheit: Eine Adresse wird besser bewertet, wenn sie im Vergleich zu anderen Adressen günstigere Werte aufweist.
@@ -214,8 +217,8 @@ Weiterhin gibt es einige Hilfs-Skripte zur Automatisierung der Datenvorverarbeit
 
 Die gezeigten Diagramme und interaktiven Karten können alle mithilfe des Notebooks erzeugt werden.
 
-![Kartenanwendung zur Darstellung einer Adresse mit berechneten Wegen zu den POIs](map.png)  
-Abbildung 7: Kartenanwendung zur Darstellung einer Adresse mit ermittelten Wegen zu den POIs
+![Kartenanwendung zur Darstellung einer Adresse mit berechneten Wegen zu den POIs](img/map.png)  
+Abbildung 8: Kartenanwendung zur Darstellung einer Adresse mit ermittelten Wegen zu den POIs
 
 ## Geocoding
 Geocoding bedeutet: Aus einer textlichen Adresse werden Koordinaten (`lat`, `lon`). Wenn ein Datensatz bereits amtliche x/y-Koordinaten enthält, ist Geocoding nicht nötig; dann reicht die Umrechnung mit `crs-conversion.py`.
