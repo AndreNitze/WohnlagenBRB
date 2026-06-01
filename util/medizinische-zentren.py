@@ -1,6 +1,7 @@
-"""
+"""Bildet medizinische Zentren aus Apotheken und nahegelegenen Arztpraxen.
+
 Medizinische Versorgung – Pipeline
----------------------------------
+----------------------------------
 Ziel (laut Anforderung):
 "Fußläufige Entfernung zu Apotheken, wobei zusätzlich mind. 2 Arztpraxen im Umkreis von 100 m erreichbar sein müssen."
 
@@ -25,8 +26,13 @@ Encoding-Hinweise:
 - Ärzte-CSV: Semikolon-getrennt; Apotheken-CSV: Komma-getrennt (konfigurierbar).
 - Spalten mit Umlaut-/Encoding-Artefakten werden normalisiert (z. B. "Stra�enname" → "Strassenname").
 
+Konfiguration:
+- `CRS_EPSG` legt das Eingabe-Koordinatensystem fest.
+- Im `__main__`-Block sind die Eingabedateien fuer Aerzte und Apotheken sowie
+  der Suchradius von 100 m gesetzt.
+
 Output dieses Skripts:
-- `out/apotheken_med_center.csv` / `.parquet`
+- `out/medzentren_geocoded.csv`
   Enthält alle Apotheken, plus:
     - `arzt_count_100m`
     - `arzt_keys_100m`

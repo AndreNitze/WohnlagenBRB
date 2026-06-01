@@ -1,3 +1,12 @@
+"""Rendert HTML-Karten aus `maps/` als PNG-Screenshots.
+
+Konfiguration:
+- CLI-Parameter wie `--maps-dir`, `--browser`, `--width`, `--height`,
+  `--scale`, `--wait-seconds` und `--overwrite` steuern den Export.
+- `DEFAULT_BROWSER_CANDIDATES` und `DEFAULT_BROWSER_COMMANDS` legen die
+  automatische Browser-Suche fest.
+"""
+
 from __future__ import annotations
 
 import argparse

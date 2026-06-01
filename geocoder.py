@@ -1,4 +1,13 @@
-﻿import csv
+"""Geocodiert Adress- oder POI-CSV-Dateien mit Nominatim.
+
+Konfiguration:
+- `CSV_EINGABE` und `CSV_AUSGABE` legen Eingabe und Ausgabe fest.
+- `CITY`, `COUNTRY` und `ZIP_CODE` schraenken die Suchanfragen ein.
+- `NOMINATIM_URL`, `RATE_LIMIT`, `USER_AGENT`, `MAX_RETRIES` und
+  `RETRY_BACKOFF_SECONDS` steuern Dienst, Fair-Use-Verhalten und Wiederholungen.
+"""
+
+import csv
 import time
 import urllib.parse
 from io import StringIO

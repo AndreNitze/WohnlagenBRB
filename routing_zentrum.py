@@ -1,3 +1,12 @@
+"""Berechnet Fusswege von allen Wohnadressen zur Jahrtausendbruecke.
+
+Konfiguration:
+- `CSV_ADDRESSES` und `CSV_OUTPUT` legen Eingabe und Ergebnisdatei fest.
+- `CITY_CENTER_LAT` und `CITY_CENTER_LON` definieren den Zielpunkt.
+- `ORS_URL`, `ORS_API_KEY`, `MAX_WORKERS`, `ORS_TIMEOUT_S` und
+  `ORS_RETRY_RADII_M` steuern die OpenRouteService-Anfragen.
+"""
+
 import json
 import threading
 import time

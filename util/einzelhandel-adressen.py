@@ -1,3 +1,12 @@
+"""Altes Spezialskript fuer Einzelhandelsrouting zu Wohnadressen.
+
+Konfiguration:
+- `ORS_URL`, `CANDIDATE_LIMIT`, `ADAPTIVE_BATCH_SIZE` und `COUNT_THRESHOLDS_M`
+  steuern Routing und Zaehlradien.
+- Eingaben sind `out/adressen_mit_routen.csv` und `out/einzelhandel_geocoded.csv`;
+  Ausgabe ist `data/adressen_mit_einzelhandel.csv`.
+"""
+
 import json
 import math
 

@@ -1,4 +1,11 @@
-# read csv with adresses
+"""Fuegt einer geocodierten Adress-CSV eine WKT-Geometry-Spalte hinzu.
+
+Konfiguration:
+- Eingabe ist fest auf `out/adressen_geocoded.csv` gesetzt.
+- Ausgabe ist fest auf `data/adressen_geocoded.csv` gesetzt.
+- Erwartet werden die Spalten `lat` und `lon`.
+"""
+
 import pandas as pd
 
 df = pd.read_csv("out/adressen_geocoded.csv", encoding="utf-8", sep=",")

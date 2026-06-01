@@ -1,3 +1,11 @@
+"""Ergaenzt Linienanzahlen aus Haltestellen in gerouteten Adressdaten.
+
+Konfiguration:
+- CLI-Parameter `--addresses`, `--stops` und `--output` steuern Ein- und Ausgabe.
+- `LINE_COLUMN`, `TARGET_PREFIX` und `COORD_DECIMALS` bestimmen Quellspalte,
+  Zielspaltenpraefix und Koordinatenabgleich.
+"""
+
 import argparse
 
 import numpy as np

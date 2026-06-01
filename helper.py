@@ -1,3 +1,13 @@
+"""Hilfsfunktionen fuer Notebooks und Karten der Wohnlagenanalyse.
+
+Konfiguration:
+- `STRASSENNAME`, `HAUSNUMMER` und `HAUSNUMMERZUSATZ` definieren die erwarteten
+  Adressspalten.
+- `TOOLTIP_FORMAT` steuert die Standardanzeige von Folium-Markern.
+- Die Funktionen laden Geo-CSV-Dateien, bauen Merge-Adressen, normalisieren
+  Werte und glaetten Cluster auf Blockebene.
+"""
+
 import pandas as pd
 import geopandas as gpd
 import folium

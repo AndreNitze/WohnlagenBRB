@@ -1,3 +1,12 @@
+"""Konvertiert amtliche x/y-Koordinaten nach WGS84 fuer die Pipeline.
+
+Konfiguration:
+- `DATASETS` definiert erlaubte Datensaetze, Eingabe-/Ausgabepfade und
+  Spaltenumbenennungen.
+- `SOURCE_CRS`, `TARGET_CRS`, `X_COL`, `Y_COL` und die erwarteten Wertebereiche
+  steuern Transformation und Plausibilitaetspruefung.
+"""
+
 import argparse
 from pathlib import Path
 

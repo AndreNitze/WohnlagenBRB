@@ -1,4 +1,15 @@
-﻿import argparse
+"""Berechnet Fusswege von Wohnadressen zu POI- oder Flaechenzielen.
+
+Konfiguration:
+- `--domain` waehlt die Zielgruppe aus `DOMAIN_CONFIGS`, aktuell Haltestellen
+  oder Einzelhandel.
+- `CSV_ADDRESSES`, `CSV_DESTINATIONS`, `AREA_PATH` und `CSV_OUTPUT` legen die
+  Ein- und Ausgabedateien fest.
+- `ORS_URL`, `ORS_API_KEY`, `MAX_WORKERS`, `DISTANCE_THRESHOLDS` und
+  Retry-/Timeout-Werte steuern das Routing gegen OpenRouteService.
+"""
+
+import argparse
 import pandas as pd
 import numpy as np
 import requests
