@@ -128,9 +128,6 @@ Am Ende prüfen:
 - Karten und Cluster wirken fachlich plausibel.
 - In der Konsolenausgabe der Routing-Skripte gibt es keine auffällige Häufung von ORS-Fehlern.
 
-### 8. Vertiefende Hinweise
-Die folgenden Abschnitte beschreiben Geocoding und Routing technischer. Sie sind vor allem für Anpassungen an neuen Datenquellen oder für die IT-Übergabe relevant.
-
 ## Wohnlagenmodell
 Hier wird das eigentliche Modell beschrieben. Die Kombination von objektiven Daten, Clustering und Validierung soll ein robustes, reproduzierbares und transparentes Bewertungsmodell schaffen. So können Veränderungen (z. B. neue Supermärkte, Schließungen von Kitas, geänderte Verkehrsführung) langfristig in die Bewertung integriert werden.
 
