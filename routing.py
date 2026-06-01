@@ -357,7 +357,7 @@ def route_poi_address_task(args):
                 best_dist = dist
 
         next_pos_idx = start + POI_ADAPTIVE_BATCH_SIZE
-        if len(candidate_pos) > POI_MAX_CANDIDATES and best_dist is not None:
+        if best_dist is not None:
             if next_pos_idx >= len(candidate_pos):
                 break
             next_air_dist = float(dists[candidate_pos[next_pos_idx]])

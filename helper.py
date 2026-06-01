@@ -53,7 +53,7 @@ def load_geocsv(path, crs="EPSG:4326", geometry_col="geometry"):
     if geometry_col in df.columns:
         # Parse vorhandene Werte; falls leer, bleibt es None
         df[geometry_col] = df[geometry_col].apply(
-            lambda x: wkt.loads(x) if isinstance(x, str) and x.startswith("POINT") else None
+            lambda x: wkt.loads(x) if isinstance(x, str) and x.strip().upper().startswith("POINT") else None
         )
     # FALL 2: "geometry" existiert NICHT
     else:
