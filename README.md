@@ -36,7 +36,17 @@ Die folgenden Originaldaten werden im aktuellen Notebook `wohnlagen_2026.ipynb` 
 | `data/Quartiere/2024_Quartiere.gpkg` | Quartiersgrenzen für Karten und räumliche Auswertung | Wird im Kartenteil des Notebooks geladen. |
 | `data/ortsteile_brandenburg.json` | Ortsteilgrenzen für Karten und räumliche Auswertung | Wird im Kartenteil des Notebooks geladen. |
 
-Zusätzlich benötigt das Notebook mehrere vorberechnete Dateien in `out/`, insbesondere Routing- und Lärmergebnisse. Diese sind keine Originaldaten, sondern Ergebnisse der Vorverarbeitungsschritte unten.
+Zusätzlich benötigt das Notebook vorberechnete Dateien in `out/`. Diese sind keine Originaldaten, sondern Ergebnisse der Vorverarbeitungsschritte unten:
+
+| Datei | Zweck | Erzeugung |
+| --- | --- | --- |
+| `out/adressen_geocoded.csv` | Geocodierte Wohnadressen als Basis für alle adressbezogenen Auswertungen | Aus der kundenseitigen Adressliste mit `geocoder.py` oder durch Übernahme bereits vorhandener `lat`/`lon`-Koordinaten. Der Name der Original-Adressdatei ist im aktuellen Notebook nicht fest verdrahtet. |
+| `out/adressen_mit_zentrum_routen.csv` | Fußwege und Distanzen der Wohnadressen zur Jahrtausendbrücke | `python routing_zentrum.py` |
+| `out/einzelhandel_geocoded.csv` | Einzelhandelsstandorte mit WGS84-Koordinaten | `python crs-conversion.py einzelhandel` |
+| `out/adressen_mit_einzelhandel_routen.csv` | Fußwege, Distanzen und 500-m-Zählung zum Einzelhandel | `python routing.py --domain einzelhandel` |
+| `out/haltestellen_geocoded.csv` | Haltestellen mit WGS84-Koordinaten | `python crs-conversion.py haltestellen` |
+| `out/adressen_mit_haltestellen_routen.csv` | Fußwege, Distanzen, 500-m-Zählung und Linienanzahl für Haltestellen | `python routing.py --domain haltestellen` |
+| `out/adressen_mit_laerm.csv` | Lärmindex je Wohnadresse | Separater Lauf von `laerm.ipynb`; für die 2026-Pipeline muss die Datei unter `out/` liegen. |
 
 ### 4. Entscheidung: externe Dienste oder lokales Docker-Setup
 Für Geocoding und Routing werden Webdienste benötigt. Es gibt zwei Betriebsarten:
@@ -46,12 +56,14 @@ Für Geocoding und Routing werden Webdienste benötigt. Es gibt zwei Betriebsart
 
 Handreichung für die IT:
 - OpenRouteService lokal bereitstellen, sodass Routing-Anfragen unter `http://localhost:8080/ors/v2/directions/foot-walking/geojson` funktionieren.
-- Optional Nominatim lokal bereitstellen, z. B. unter `http://localhost:8081/search.php` oder einer entsprechend in `geocoder.py` eingetragenen URL.
+- Optional Nominatim lokal bereitstellen. Die konkrete interne URL muss in `geocoder.py` als `NOMINATIM_URL` eingetragen werden.
 - OSM-/PBF-Datenstand, Speicherbedarf, CPU/RAM, Persistenz der Docker-Volumes, Updates, Backups, Ports und Proxy/Firewall regeln.
 - API-Schlüssel nur zentral verwalten und nicht in öffentlich geteilte Dateien schreiben.
 
 ### 5. Datenvorverarbeitung und Geocoding
 Die Rohdaten liegen in `data/`. Für jeden Datensatz muss am Ende eine Datei mit Koordinaten in WGS84 entstehen, also mit den Spalten `lat` und `lon`.
+
+Zuerst muss die Wohnadressliste zu `out/adressen_geocoded.csv` aufbereitet werden. Diese Datei ist die zentrale Eingabe für Zentrumsrouting, Lärmberechnung und alle späteren Adress-Merges. Wenn die Adressliste noch keine Koordinaten enthält, wird `geocoder.py` verwendet. Wenn die Adressliste bereits Koordinaten enthält, muss sie in dasselbe Format gebracht werden: mindestens `Straßenname`, `Hsnr`, optional `HsnrZus`, `lat`, `lon` und nach Möglichkeit `geometry`.
 
 Wenn bereits amtliche x/y-Koordinaten in EPSG:25833 vorhanden sind, werden sie ohne externes Geocoding umgerechnet:
 
@@ -60,11 +72,10 @@ python crs-conversion.py haltestellen
 python crs-conversion.py einzelhandel
 ```
 
-Medizinische Zentren werden aus Apotheken und Arztpraxen gebildet:
+Die Lärmbelastung wird separat vorbereitet:
 
-```bash
-python medizinische-zentren.py
-```
+- `laerm.ipynb` lädt die Lärmkartierung und verschneidet sie mit den geocodierten Wohnadressen.
+- Für `wohnlagen_2026.ipynb` muss das Ergebnis als `out/adressen_mit_laerm.csv` vorliegen.
 
 Für Adressen oder POI-Listen ohne Koordinaten wird `geocoder.py` verwendet. Vorher oben im Skript `CSV_EINGABE`, `CSV_AUSGABE`, `NOMINATIM_URL`, `RATE_LIMIT` und `USER_AGENT` prüfen und anpassen. Danach:
 
@@ -99,7 +110,7 @@ Die wichtigsten Ergebnisdateien sind:
 - `out/adressen_mit_einzelhandel_routen.csv`
 - `out/adressen_mit_haltestellen_routen.csv`
 
-Weitere Routing-Dateien, z. B. für Kitas, Grundschulen, Grünflächen oder medizinische Zentren, können bereits als vorberechnete Dateien in `out/` liegen oder müssen analog mit passend konfigurierten Skripten erzeugt werden. Entscheidend ist, dass das Notebook die erwarteten `out/adressen_mit_*_routen.csv`-Dateien findet.
+Für externe OpenRouteService-Nutzung müssen in `routing.py` und `routing_zentrum.py` mindestens `ORS_URL` und `ORS_API_KEY` angepasst werden. Zusätzlich müssen die Abruflimits geprüft und `MAX_WORKERS` ggf. deutlich reduziert werden, damit keine API-Limits verletzt werden. Für große oder regelmäßige Läufe ist der lokale Docker-Betrieb vorzuziehen.
 
 ### 7. Notebook ausführen und Ergebnisse prüfen
 Jupyter starten:
@@ -124,20 +135,15 @@ Die folgenden Abschnitte beschreiben Geocoding und Routing technischer. Sie sind
 Hier wird das eigentliche Modell beschrieben. Die Kombination von objektiven Daten, Clustering und Validierung soll ein robustes, reproduzierbares und transparentes Bewertungsmodell schaffen. So können Veränderungen (z. B. neue Supermärkte, Schließungen von Kitas, geänderte Verkehrsführung) langfristig in die Bewertung integriert werden.
 
 ### Kriterien
-Das Modell zur Bewertung der Wohnlagen bezieht bereits die folgenden Kriterien ein (Distanzen immer in Metern):
+Das aktuelle 2026-Modell bezieht die folgenden Kriterien ein (Distanzen immer in Metern):
 - Fußläufige Distanz zum Zentrum (Jahrtausendbrücke)
-- Kitas und Schulen
-    - Fußläufige Distanz zur nächstgelegenen Kita
-    - Fußläufige Distanz zur nächstgelegenen Schule
-    - Anzahl Kitas im Umkreis von 500, 800 und 1000 Metern
-    - Anzahl Schulen im Umkreis von 500, 800 und 1000 Metern
 - Einzelhandel
     - Fußläufige Distanz zum nächsten Einzelhandel
-    - Anzahl von Einzelhandelsmärkten im Umkreis von 500 und 800 Metern
+    - Anzahl von Einzelhandelsmärkten im Umkreis von 500 Metern
 - ÖPNV
-    - Anzahl von ÖPNV-Haltestellen (Bus und Straßenbahn) im Umkreis von 500 und 800 Metern
-    - ÖPNV-Taktung der nächsten Haltestelle morgens (6 - 9 Uhr) in Minuten
-    - ÖPNV-Taktung der nächsten Haltestelle abends (16 - 19 Uhr) in Minuten
+    - Fußläufige Distanz zur nächsten ÖPNV-Haltestelle
+    - Anzahl von ÖPNV-Haltestellen im Umkreis von 500 Metern
+    - Anzahl der Linien an der nächsten Haltestelle
 - Lärm-Index (laut [Lärmkartierung 2022](https://mleuv.brandenburg.de/mleuv/de/umwelt/immissionsschutz/laerm/umgebungslaerm/laermkartierung/#))
 - Lage vor bzw. hinter Bahnübergängen vom Stadtzentrum aus
 
@@ -217,9 +223,9 @@ Abbildung 7: Kartenanwendung zur Darstellung einer Adresse mit ermittelten Wegen
 ## Geocoding
 Geocoding bedeutet: Aus einer textlichen Adresse werden Koordinaten (`lat`, `lon`). Wenn ein Datensatz bereits amtliche x/y-Koordinaten enthält, ist Geocoding nicht nötig; dann reicht die Umrechnung mit `crs-conversion.py`.
 
-Für größere Adresslisten sollte ein Nominatim-Server in einem lokalen Docker-Container verwendet werden (s. [Nominatim-Docker-Anleitung](https://hub.docker.com/r/mediagis/nominatim)). Anfragen sehen dann z. B. so aus:
+Für größere Adresslisten sollte ein Nominatim-Server in einem lokalen Docker-Container verwendet werden (s. [Nominatim-Docker-Anleitung](https://hub.docker.com/r/mediagis/nominatim)). Die konkrete URL hängt vom IT-Setup ab und wird in `geocoder.py` als `NOMINATIM_URL` eingetragen. Anfragen sehen dann z. B. so aus:
 ```
-GET http://localhost:8081/search.php?addressdetails=0&q=Hauptstraße,brandenburg%20an%20der%20havel&format=jsonv2
+GET http://<nominatim-host>/search?addressdetails=0&q=Hauptstraße,brandenburg%20an%20der%20havel&format=jsonv2
 ```
 
 Mit dem Skript ```geocoder.py``` können CSV-Dateien mit den Spalten "Straßenname" (oder "Straßennamen"), "Hsnr" und "HsnrZus" geocodiert werden. Die Eingabe- und Ausgabedatei werden oben im Skript über `CSV_EINGABE` und `CSV_AUSGABE` festgelegt; die Ausgabe sollte in der Regel unter `out/*_geocoded.csv` liegen.
