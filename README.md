@@ -1,6 +1,125 @@
 # Wohnlagen-Analyse
 Ein Projekt zur systematischen Bewertung von Wohnlagen in der Stadt Brandenburg an der Havel anhand objektiver Kriterien.
 
+## Schnellanleitung: Pipeline ausführen
+Diese "Waschanleitung" beschreibt die Reihenfolge, in der die Daten vorbereitet, geocodiert, geroutet und im Notebook ausgewertet werden. Sie richtet sich an Anwender:innen mit Statistik-Hintergrund. Alles, was Serverbetrieb, Docker, API-Schlüssel, Ports, Firewall, Proxy, Datenschutz oder regelmäßige Aktualisierung betrifft, sollte an die IT-Abteilung übergeben werden.
+
+### 1. Zuständigkeiten klären
+- **Fach-/Statistik-Anwender:innen** prüfen und aktualisieren die CSV-/Geodaten in `data/`, passen bei Bedarf die Dateinamen am Anfang der Skripte an, starten die Python-Skripte und kontrollieren die Ergebnisdateien in `out/`.
+- **IT-Abteilung** richtet Python/Jupyter, Docker, lokale Geocoding-/Routing-Dienste, API-Schlüssel, Netzwerkfreigaben und ausreichend Rechenressourcen ein.
+- **Grenze zur IT:** Sobald ein Dienst lokal betrieben werden soll, eine externe API produktiv genutzt wird, Zugangsdaten gebraucht werden oder ein Fehler mit Ports/Netzwerk/Docker auftritt, ist das kein Statistikproblem mehr, sondern IT-Betrieb.
+
+### 2. Arbeitsumgebung vorbereiten
+Alle Befehle werden im Projektordner ausgeführt.
+
+```bash
+uv sync
+```
+
+Alternativ:
+
+```bash
+pip install -r requirements.txt
+```
+
+Danach sollten die Ordner `data/` mit den Eingangsdaten und `out/` für Zwischenergebnisse vorhanden sein. Falls `out/` fehlt, kann er leer angelegt werden.
+
+### 3. Originaldaten bereitstellen
+Die folgenden Originaldaten werden im aktuellen Notebook `wohnlagen_2026.ipynb` direkt verwendet oder dort als Vorverarbeitungsquelle für die benötigten `out/`-Dateien genannt. Sie müssen vor dem Lauf an genau diesen Pfaden bereitstehen:
+
+| Datei | Zweck in der Pipeline | Hinweis |
+| --- | --- | --- |
+| `data/2026-02-12-Blockgrenzen.gpkg` | Zuordnung der Adressen zu Blöcken und Grundlage für die blockbasierte SKATER-Glättung | Muss eine Spalte `BLOCK` und Geometrien enthalten. |
+| `data/Gebaeudetypologie.csv` | Ergänzung der Gebäudetypologie je Adresse | Wird im Notebook direkt geladen. |
+| `data/2026_Einzelhandel.csv` | Originaldaten der Einzelhandelsstandorte | Wird mit `crs-conversion.py einzelhandel` zu `out/einzelhandel_geocoded.csv` vorbereitet. |
+| `data/2026_Haltestellen.csv` | Originaldaten der ÖPNV-Haltestellen | Wird mit `crs-conversion.py haltestellen` zu `out/haltestellen_geocoded.csv` vorbereitet. |
+| `data/Quartiere/2024_Quartiere.gpkg` | Quartiersgrenzen für Karten und räumliche Auswertung | Wird im Kartenteil des Notebooks geladen. |
+| `data/ortsteile_brandenburg.json` | Ortsteilgrenzen für Karten und räumliche Auswertung | Wird im Kartenteil des Notebooks geladen. |
+
+Zusätzlich benötigt das Notebook mehrere vorberechnete Dateien in `out/`, insbesondere Routing- und Lärmergebnisse. Diese sind keine Originaldaten, sondern Ergebnisse der Vorverarbeitungsschritte unten.
+
+### 4. Entscheidung: externe Dienste oder lokales Docker-Setup
+Für Geocoding und Routing werden Webdienste benötigt. Es gibt zwei Betriebsarten:
+
+- **Externe Dienste:** einfacher Start, aber abhängig von Internet, Nutzungsbedingungen, Datenschutzbewertung und Abruflimits. Für OpenRouteService müssen die aktuellen Beschränkungen vor jedem produktiven Lauf geprüft werden: [openrouteservice.org/restrictions](https://openrouteservice.org/restrictions/).
+- **Lokaler Docker-Betrieb:** mehr Einrichtungsaufwand durch die IT, dafür besser für große Batchläufe, reproduzierbarer und weniger abhängig von externen Tageslimits. Details stehen in den Anbieter-Dokumentationen zu [OpenRouteService lokal betreiben](https://giscience.github.io/openrouteservice/run-instance) und [Nominatim per Docker](https://hub.docker.com/r/mediagis/nominatim).
+
+Handreichung für die IT:
+- OpenRouteService lokal bereitstellen, sodass Routing-Anfragen unter `http://localhost:8080/ors/v2/directions/foot-walking/geojson` funktionieren.
+- Optional Nominatim lokal bereitstellen, z. B. unter `http://localhost:8081/search.php` oder einer entsprechend in `geocoder.py` eingetragenen URL.
+- OSM-/PBF-Datenstand, Speicherbedarf, CPU/RAM, Persistenz der Docker-Volumes, Updates, Backups, Ports und Proxy/Firewall regeln.
+- API-Schlüssel nur zentral verwalten und nicht in öffentlich geteilte Dateien schreiben.
+
+### 5. Datenvorverarbeitung und Geocoding
+Die Rohdaten liegen in `data/`. Für jeden Datensatz muss am Ende eine Datei mit Koordinaten in WGS84 entstehen, also mit den Spalten `lat` und `lon`.
+
+Wenn bereits amtliche x/y-Koordinaten in EPSG:25833 vorhanden sind, werden sie ohne externes Geocoding umgerechnet:
+
+```bash
+python crs-conversion.py haltestellen
+python crs-conversion.py einzelhandel
+```
+
+Medizinische Zentren werden aus Apotheken und Arztpraxen gebildet:
+
+```bash
+python medizinische-zentren.py
+```
+
+Für Adressen oder POI-Listen ohne Koordinaten wird `geocoder.py` verwendet. Vorher oben im Skript `CSV_EINGABE`, `CSV_AUSGABE`, `NOMINATIM_URL`, `RATE_LIMIT` und `USER_AGENT` prüfen und anpassen. Danach:
+
+```bash
+python geocoder.py
+```
+
+Wichtige Kontrolle nach jedem Schritt: Die erzeugten Dateien in `out/` dürfen nicht leer sein, `lat`/`lon` müssen gefüllt sein und die Koordinaten müssen ungefähr im Stadtgebiet Brandenburg an der Havel liegen.
+
+### 6. Routing berechnen
+Vor dem Routing muss OpenRouteService erreichbar sein. Bei lokalem Betrieb sollte die IT bestätigen, dass der Dienst läuft. Die Skripte erwarten standardmäßig:
+
+```text
+http://localhost:8080/ors/v2/directions/foot-walking/geojson
+```
+
+Zentrumsrouting zur Jahrtausendbrücke:
+
+```bash
+python routing_zentrum.py
+```
+
+POI-Routing für unterstützte Domains:
+
+```bash
+python routing.py --domain einzelhandel
+python routing.py --domain haltestellen
+```
+
+Die wichtigsten Ergebnisdateien sind:
+- `out/adressen_mit_zentrum_routen.csv`
+- `out/adressen_mit_einzelhandel_routen.csv`
+- `out/adressen_mit_haltestellen_routen.csv`
+
+Weitere Routing-Dateien, z. B. für Kitas, Grundschulen, Grünflächen oder medizinische Zentren, können bereits als vorberechnete Dateien in `out/` liegen oder müssen analog mit passend konfigurierten Skripten erzeugt werden. Entscheidend ist, dass das Notebook die erwarteten `out/adressen_mit_*_routen.csv`-Dateien findet.
+
+### 7. Notebook ausführen und Ergebnisse prüfen
+Jupyter starten:
+
+```bash
+jupyter lab
+```
+
+Dann `wohnlagen_2026.ipynb` von oben nach unten ausführen. Das Notebook lädt die vorberechneten Geocoding-, Routing-, Lärm-, Typologie- und Blockdaten, führt die Merkmale zusammen und erzeugt die Wohnlagenbewertung.
+
+Am Ende prüfen:
+- Exportdateien wie `out/wohnlagen_brb_2026.csv` und `out/wohnlagen_brb_2026.gpkg` wurden geschrieben.
+- Die Anzahl der Adressen ist plausibel.
+- Distanzspalten enthalten nicht überwiegend leere Werte.
+- Karten und Cluster wirken fachlich plausibel.
+- In der Konsolenausgabe der Routing-Skripte gibt es keine auffällige Häufung von ORS-Fehlern.
+
+### 8. Vertiefende Hinweise
+Die folgenden Abschnitte beschreiben Geocoding und Routing technischer. Sie sind vor allem für Anpassungen an neuen Datenquellen oder für die IT-Übergabe relevant.
+
 ## Wohnlagenmodell
 Hier wird das eigentliche Modell beschrieben. Die Kombination von objektiven Daten, Clustering und Validierung soll ein robustes, reproduzierbares und transparentes Bewertungsmodell schaffen. So können Veränderungen (z. B. neue Supermärkte, Schließungen von Kitas, geänderte Verkehrsführung) langfristig in die Bewertung integriert werden.
 
@@ -28,43 +147,39 @@ Abbildung 1: Visualisierung des gemessenen Lärm-Index mit Adressen
 Das Modell kann beliebig um neue Kriterien erweitert werden. Denkbar sind zum Beispiel auch neue Kriterien wie "zwischen der Adresse und dem Zentrum gibt es einen Bahnübergang" oder Ähnliches. Dadurch kann die Trennschärfe des Modells verbessert werden, was anhand der Gütemaße (s.u.) sichtbar werden sollte.
 
 ![Visualisierung der Querung von Bahnübergängen (Beispiel)](bahn.png)
-Abbildung 2: Visualisierung der Querung von Bahnübergängen (Beispiel
+Abbildung 2: Visualisierung der Querung von Bahnübergängen (Beispiel)
 
 Die **Kriterien fließen gewichtet in das Modell** ein. Diese Gewichtung ist nur vorläufig definiert und sollte für den langfristigen Einsatz möglichst festgeschrieben werden.
 
 ### Clustering-Ansatz
 
-Zur eigentlichen Bildung von Wohnlagen wird ein **K-Means-Clustering** auf Basis der berechneten Kriterienwerte durchgeführt. Jede Adresse erhält zunächst einen Vektor von standardisierten Z-Scores (z. B. für Zentrumsnähe, Lärmindex, Anzahl erreichbarer Ärzte oder Lebensmittelmärkte). Der K-Means-Algorithmus teilt diese Adresspunkte in eine vorab definierte Zahl von Clustern ein. Jedes Cluster entspricht dabei einer Wohnlagenkategorie, also einem Bereich mit ähnlicher Qualität und vergleichbarer Infrastruktur.
+Der aktuelle Hauptansatz zur Bildung der Wohnlagen ist **SKATER auf Blockebene**. Dafür werden die adressbezogenen Merkmale zunächst auf Blockgrenzen aggregiert. Anschließend bildet SKATER räumlich zusammenhängende Cluster. Diese Cluster entsprechen den Wohnlagenkategorien und werden danach wieder den enthaltenen Adressen zugeordnet.
 
-Im Notebook werden diese Ergebnisse inzwischen in mehreren, klar getrennten Varianten geführt:
-- **K-Means Original**: reine Clusterung auf Adressebene, ohne Blockglättung
-- **K-Means Blockglättung**: Mehrheitszuordnung innerhalb eines Blocks, um die Adress-Cluster auf Blockebene vergleichen zu können
-- **SKATER Adressen**: optionaler älterer Glättungsansatz auf Adressebene, primär für Vergleichszwecke
-- **SKATER Blöcke**: neuer flächenbasierter Ansatz auf aggregierten Blockdaten
+Der Vorteil gegenüber einer rein adressbezogenen Clusterung ist, dass Wohnlagen nicht als verstreute Einzelpunkte entstehen, sondern als räumlich nachvollziehbare Flächen. Das passt besser zur fachlichen Erwartung an Wohnlagen und erleichtert die spätere Plausibilisierung auf Karten.
 
 In einer visuellen Plausibilitätsprüfung (vgl. Abbildung 2) ergeben sich gut nachvollziehbare Cluster, wie zum Beispiel "orange" als zentrumsnahe Lage mit sehr guter Nahversorgung in allen definierten Kriterien. Das blaue Cluster zeigt Adressen in Randlagen. 
 
-Es wird aber immer auch **Abweichnungen von der subjektiven Bewertung** geben. Diese "gefühlten" Abweichungen können mehrere Gründe haben:
+Es wird aber immer auch **Abweichungen von der subjektiven Bewertung** geben. Diese "gefühlten" Abweichungen können mehrere Gründe haben:
 - Es gibt Kriterien, die die Wohnlage erheblich beeinflussen, aber noch nicht im Modell enthalten sind. In dem Fall können die Daten einfach ergänzt und in das Gewichtungsmodell eingefügt werden.
 - Es treten subjektive Fehlannahmen auf, z. B. ein historisch oder in der Bevölkerung als "schlecht" wahrgenommenes Viertel, das nach sachlichen Kriterien aber aktuell besser bewertet wird.
 
 Das gewählte Clustering-Verfahren erzeugt insgesamt eine datenbasierte, objektiv überprüfbare und erweiterbare Grundlage für die Einteilung von Wohnlagen. Je mehr relevante Daten eingefügt werden, desto präziser wird das Modell.
 
 ![Beispiel-Clustering von Brandenburg an der Havel mit einigen Kriterien](cluster-example.png)
-Abbildung 3: Beispielhaftes Clustering (K-Means) von Brandenburg an der Havel mit Kitas, Schulen, Haltestellen, Supermärkten und Zentrumsnähe als Kriterien.
+Abbildung 3: Frühere Vergleichsdarstellung einer adressbezogenen K-Means-Clusterung mit Kitas, Schulen, Haltestellen, Supermärkten und Zentrumsnähe als Kriterien.
 
-Die Wahl der Clusteranzahl erfolgt nicht willkürlich, sondern orientiert sich an **statistischen Gütekriterien** (z. B. Elbow-Methode oder Silhouette-Score). So wird sichergestellt, dass die Cluster trennscharf genug sind und die zugrunde liegenden Unterschiede in den Adressdaten tatsächlich widerspiegeln.
+Die Wahl der Clusteranzahl erfolgt nicht willkürlich, sondern orientiert sich an **statistischen Gütekriterien** und fachlicher Plausibilität. Im Notebook werden dazu unter anderem Kennzahlen und Kartendarstellungen erzeugt. So wird geprüft, ob die Cluster trennscharf genug sind und die räumlichen Ergebnisse sinnvoll zusammenhängende Wohnlagen bilden.
 
 ![Silhouette-Score (Beispiel) für verschiedene Cluster-Anzahl](silhouette-example.png)
 Abbildung 4: Silhouette-Score (Beispiel) für verschiedene Cluster-Anzahl
 
-### Glättung mit SKATER
-Im aktuellen Stand werden zwei SKATER-Perspektiven unterschieden. Der ältere Ansatz arbeitet adressbasiert und kann im Notebook gezielt ein- oder ausgeschaltet werden, ist aber rechenintensiv und dient vor allem dem Vergleich. Der neuere Standardansatz arbeitet auf **Blockebene**: Dafür werden die Modellmerkmale zunächst auf Blockgrenzen aggregiert und anschließend mit SKATER zu zusammenhängenden Flächenclustern geglättet. Die so erzeugten Block-Cluster werden danach wieder den enthaltenen Adressen zugeordnet.
+### Verhältnis zu K-Means
+K-Means wird nicht mehr als vorherrschender Ansatz genutzt, sondern nur noch als Vergleichs- und Analysevariante. Die entsprechende Herleitung und PCA-/K-Means-Auswertung liegt im Notebook `wohnlagen_kmeans_pca.ipynb`.
 
-Dadurch lassen sich Original-K-Means, adressbasierte Glättung und blockbasierte Glättung direkt miteinander vergleichen, ohne dass das ursprüngliche Clustering überschrieben wird.
+Für die eigentliche Wohnlagenbildung ist `wohnlagen_2026.ipynb` maßgeblich. Dort steht die blockbasierte SKATER-Auswertung im Vordergrund.
 
 ![Beispielhafte Wohnlagen mit SKATER-Bereinigung mit 7 Clustern](skater.png)
-Abbildung 5: Beispielhafte Wohnlagen mit SKATER-Bereinigung mit 7 Clustern
+Abbildung 5: Beispielhafte Wohnlagen mit SKATER auf Blockebene mit 7 Clustern
 
 ### Validierung
 Um die Qualität der Ergebnisse zu prüfen, werden verschiedene Validierungsschritte genutzt:
@@ -88,7 +203,7 @@ Das bedeutet jedoch nicht zwingend, dass eine Verbesserung an einem Ort automati
 
 
 ## Aufbau
-Das Hauptdokument ist das Jupyter-Notebook ```wohnlagen.ipynb```. 
+Das aktuelle Hauptdokument ist das Jupyter-Notebook ```wohnlagen_2026.ipynb```. Das ältere Notebook ```wohnlagen.ipynb``` enthält weiterhin Herleitungen und frühere Analysevarianten.
 
 Für die korrekte Ausführung wird ein Ordner ```/data``` erwartet, in dem sich die Adressen und weitere Datenquellen befinden. Die erwarteten Dateinamen finden sich im Notebook.
 
@@ -100,21 +215,26 @@ Die gezeigten Diagramme und interaktiven Karten können alle mithilfe des Notebo
 Abbildung 7: Kartenanwendung zur Darstellung einer Adresse mit ermittelten Wegen zu den POIs
 
 ## Geocoding
-Für die Geocodierung der Adressen wird ein Nominatim-Server in einem lokalen Docker-Container (s. [Anleitung](https://hub.docker.com/r/mediagis/nominatim)) verwendet, sodass Anfragen in dieser Art gestellt werden können:
+Geocoding bedeutet: Aus einer textlichen Adresse werden Koordinaten (`lat`, `lon`). Wenn ein Datensatz bereits amtliche x/y-Koordinaten enthält, ist Geocoding nicht nötig; dann reicht die Umrechnung mit `crs-conversion.py`.
+
+Für größere Adresslisten sollte ein Nominatim-Server in einem lokalen Docker-Container verwendet werden (s. [Nominatim-Docker-Anleitung](https://hub.docker.com/r/mediagis/nominatim)). Anfragen sehen dann z. B. so aus:
 ```
 GET http://localhost:8081/search.php?addressdetails=0&q=Hauptstraße,brandenburg%20an%20der%20havel&format=jsonv2
 ```
 
-Mit dem Skript ```geocoder.py``` können für beliebige CSV-Dateien mit den Spalten "Straßenname" (oder "Straßennamen"), "Hsnr" und "HsnrZus" Längen- und Breitengrad-Koordinaten ermittelt werden. Die CSV-Datei muss im gleichen Verzeichnis liegen wie das Skript und die Ausgabe wird in einer neuen Datei mit dem Suffix "_geocoded" gespeichert.
-Bus- und Straßenbahnhaltestellen sind mit lokalem Nominatim und OSM-Daten schwer zu finden. Dafür wurde der offizielle Nominatim-Server von [OpenStreetMap](https://nominatim.openstreetmap.org/) unter Einhaltung der Fair Use Policy verwendet.
+Mit dem Skript ```geocoder.py``` können CSV-Dateien mit den Spalten "Straßenname" (oder "Straßennamen"), "Hsnr" und "HsnrZus" geocodiert werden. Die Eingabe- und Ausgabedatei werden oben im Skript über `CSV_EINGABE` und `CSV_AUSGABE` festgelegt; die Ausgabe sollte in der Regel unter `out/*_geocoded.csv` liegen.
+
+Bus- und Straßenbahnhaltestellen sind mit lokalem Nominatim und OSM-Daten teilweise schwer zu finden. Dafür wurde stellenweise der offizielle Nominatim-Server von [OpenStreetMap](https://nominatim.openstreetmap.org/) unter Beachtung der Fair-Use-Regeln verwendet. Für größere oder wiederholte Läufe sollte diese Entscheidung vorher mit der IT abgestimmt werden.
 
 ## Routing
-Das Routing erfolgt über die [OpenRouteService API](https://openrouteservice.org/), die entweder von einem externen Server abgerufen wird (Standard, mit Abrufbeschränkungen) oder in einem lokalen Docker-Container betrieben wird (s. [Anleitung](https://giscience.github.io/openrouteservice/run-instance)). Die API kann bei lokalem Einsatz dann über folgende URL aufgerufen werden:
+Routing bedeutet: Aus zwei Koordinaten wird eine reale Fußwegdistanz entlang des Wegenetzes berechnet. Das Routing erfolgt über die [OpenRouteService API](https://openrouteservice.org/), entweder als externer Dienst mit Abrufbeschränkungen oder in einem lokalen Docker-Container (s. [ORS-Anleitung](https://giscience.github.io/openrouteservice/run-instance)). Die jeweils aktuellen externen Beschränkungen stehen unter [openrouteservice.org/restrictions](https://openrouteservice.org/restrictions/).
+
+Bei lokalem Einsatz wird die API standardmäßig über folgende URL aufgerufen:
 ```
 POST http://localhost:8080/ors/v2/directions/foot-walking/geojson
 ```
 
-Im HTTP Body werden die Koordinaten (erste = Startpunkt, zweite = Jahrtausendbrücke) und Parameter für die Rückgabe (geometry = Wegpunkte) übergeben:
+Im HTTP Body werden die Koordinaten (erste = Startpunkt, zweite = Zielpunkt) und Parameter für die Rückgabe (geometry = Wegpunkte) übergeben:
 ```json
 {
     "coordinates": [
@@ -132,6 +252,8 @@ Im HTTP Body werden die Koordinaten (erste = Startpunkt, zweite = Jahrtausendbr�
     "preference": "recommended"
 }
 ```
+
+Für die normale Ausführung müssen diese HTTP-Anfragen nicht von Hand gebaut werden. Die Skripte `routing_zentrum.py` und `routing.py` senden die Anfragen automatisch und schreiben die vorberechneten Distanz- und Routendateien nach `out/`.
 
 
 ## Verbesserungsmöglichkeiten
