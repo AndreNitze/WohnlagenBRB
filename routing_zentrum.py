@@ -15,6 +15,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import numpy as np
 import pandas as pd
 import requests
+from requests.adapters import HTTPAdapter
 
 
 ORS_URL = "http://localhost:8080/ors/v2/directions/foot-walking/geojson"
@@ -35,6 +36,7 @@ ROUTE_SUCCESS_COUNT = 0
 ROUTE_ERROR_COUNT = 0
 ROUTE_ERROR_LIMIT = 10
 COUNTER_LOCK = threading.Lock()
+THREAD_LOCAL = threading.local()
 
 
 def haversine_np(lat1, lon1, lat2, lon2):
@@ -65,6 +67,18 @@ def distance_from_linestring_m(geometry):
     return float(np.sum(seg_m))
 
 
+def get_ors_session():
+    """Liefert pro Thread eine wiederverwendbare HTTP-Session fuer ORS."""
+    session = getattr(THREAD_LOCAL, "ors_session", None)
+    if session is None:
+        session = requests.Session()
+        adapter = HTTPAdapter(pool_connections=1, pool_maxsize=1)
+        session.mount("http://", adapter)
+        session.mount("https://", adapter)
+        THREAD_LOCAL.ors_session = session
+    return session
+
+
 def route_to_center(addr_idx, lon_a, lat_a):
     global ROUTE_SUCCESS_COUNT, ROUTE_ERROR_COUNT
 
@@ -83,7 +97,7 @@ def route_to_center(addr_idx, lon_a, lat_a):
             payload["radiuses"] = [radius, radius]
 
         try:
-            response = requests.post(
+            response = get_ors_session().post(
                 ORS_URL,
                 data=json.dumps(payload),
                 headers={"Authorization": ORS_API_KEY, "Content-Type": "application/json"},
